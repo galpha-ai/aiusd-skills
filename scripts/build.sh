@@ -17,9 +17,10 @@ log_success() { echo -e "${GREEN}✅${NC} $1"; }
 log_warning() { echo -e "${YELLOW}⚠️${NC} $1"; }
 log_error() { echo -e "${RED}❌${NC} $1"; }
 
-# Project directory
+# Project directory - go up one level from scripts/
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cd "$SCRIPT_DIR"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+cd "$PROJECT_ROOT"
 
 echo "🏗️  Building AIUSD Skills MCP Client"
 echo "==================================="
@@ -93,7 +94,6 @@ echo "🚀 Usage:"
 echo "  node dist/index.js --help"
 echo "  npm start -- --help"
 echo ""
-echo "📦 To install globally:"
-echo "  npm install -g ."
-echo "  aiusd-client --help"
+echo "📦 To package as skill:"
+echo "  npm run build-skill"
 echo ""

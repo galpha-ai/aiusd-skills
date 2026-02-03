@@ -1,169 +1,152 @@
 ---
 name: aiusd-skill
-description: AIUSD交易和账户管理技能。零配置启动，自动处理依赖安装、项目构建和认证设置。支持余额查询、交易执行、质押等操作。
+description: AIUSD trading and account management skill. Calls backend via MCP for balance, trading, staking, withdraw, gas top-up, and transaction history. Auth priority: MCP_HUB_TOKEN env, then mcporter OAuth or local token file.
 ---
 
-# AIUSD Skill
+# AIUSD Skill (Agent Reference)
 
-⚡ **零配置启动** - 自动处理所有设置步骤的AIUSD交易技能
+This skill calls the AIUSD backend via MCP. Auth is resolved in order: env `MCP_HUB_TOKEN`, mcporter OAuth, or local `~/.mcp-hub/token.json`. Ensure a valid Bearer token is available before calling.
 
-## 🚀 即用特性
+## Tool Overview
 
-### ✨ **一键启动**
-直接运行即可，skill会自动：
-- 📦 安装所需依赖
-- 🔨 编译TypeScript代码
-- 🔐 设置OAuth认证
-- 🧪 测试MCP连接
-- 📋 显示可用功能
+| Tool | Purpose | Typical user intents |
+|------|---------|----------------------|
+| genalpha_get_balances | Query account balances | balance, how much, account balance |
+| genalpha_get_trading_accounts | Get trading accounts / addresses | my account, trading account, wallet address |
+| genalpha_execute_intent | Execute trade intent (buy/sell/swap) | buy, sell, buy SOL with USDC, swap |
+| genalpha_stake_aiusd | Stake AIUSD | stake, stake AIUSD |
+| genalpha_unstake_aiusd | Unstake | unstake |
+| genalpha_withdraw_to_wallet | Withdraw to external wallet | withdraw, transfer out |
+| genalpha_ensure_gas | Top up Gas for on-chain account | top up gas, ensure gas |
+| genalpha_get_transactions | Query transaction history | history, recent transactions |
+| reauth / login | Re-authenticate / login | login, re-login, auth expired, 401 |
 
-### 🎯 **智能认证**
-技能会自动检测并使用可用的认证方式：
-1. 环境变量 (`MCP_HUB_TOKEN`)
-2. mcporter OAuth (自动浏览器登录)
-3. 本地token文件
+## Tool Reference and Call Usage
 
-**无需手动配置** - 首次使用时会引导完成认证设置。
+### genalpha_get_balances
 
-## 📋 核心功能
+- **Purpose**: Return user AIUSD custody and staking account balances.
+- **When to use**: User asks for balance, how much, account assets.
+- **Params**: None. Pass `{}`.
+- **Example**: `call genalpha_get_balances` or `call genalpha_get_balances --params '{}'`.
 
-### 1. 账户信息查询
-查看您的AIUSD账户余额和交易账户地址。
+### genalpha_get_trading_accounts
 
-**触发词**：查看余额、我的账户、账户信息
+- **Purpose**: Return user trading accounts (addresses, etc.) per chain.
+- **When to use**: User asks "my account", "trading account", "wallet address".
+- **Params**: None. Pass `{}`.
+- **Example**: `call genalpha_get_trading_accounts`.
 
-**示例**：
-- "查看我的AIUSD余额"
-- "显示所有账户信息"
-- "我有多少钱"
+### genalpha_execute_intent
 
-### 2. 交易执行
-通过TIM (Trading Intent Model) 执行各类交易操作。
+- **Purpose**: Execute buy/sell/swap (e.g. buy SOL with USDC, sell ETH).
+- **When to use**: User clearly wants to place order, buy, sell, swap.
+- **Params** (JSON):
+  - `chain_id` (string, required): Chain ID, e.g. `solana:mainnet-beta`, `eip155:1`.
+  - `intent` (string, required): Intent payload, usually XML or structured string, parsed by backend.
+- **Example**: `call genalpha_execute_intent --params '{"chain_id":"solana:mainnet-beta","intent":"<buy amount=\"100\" from=\"USDC\" to=\"SOL\"/>"}'`. Check MCP server schema for exact intent format; use `tools --detailed` before calling.
 
-**触发词**：买入、卖出、交换、swap、交易
+### genalpha_stake_aiusd
 
-**示例**：
-- "用100 USDC买SOL"
-- "卖出所有ETH换成USDC"
-- "在Solana上交易"
+- **Purpose**: Stake AIUSD for yield (e.g. sAIUSD).
+- **When to use**: User says stake, stake AIUSD.
+- **Params**: Per MCP server schema; often includes amount; otherwise pass `{}`. Use `tools --detailed` to confirm.
+- **Example**: `call genalpha_stake_aiusd --params '{"amount":"100"}'` if server expects amount.
 
-### 3. AIUSD质押管理
-质押AIUSD获得收益，或取消质押。
+### genalpha_unstake_aiusd
 
-**触发词**：质押、stake、取消质押、unstake
+- **Purpose**: Unstake AIUSD (e.g. redeem sAIUSD).
+- **When to use**: User says unstake, redeem.
+- **Params**: Per MCP server schema; pass `{}` if none.
+- **Example**: `call genalpha_unstake_aiusd --params '{}'` or pass amount/position per server.
 
-**示例**：
-- "质押100 AIUSD"
-- "取消质押50 sAIUSD"
-- "查看质押收益"
+### genalpha_withdraw_to_wallet
 
-### 4. 资金提取
-将稳定币提取到外部钱包地址。
+- **Purpose**: Withdraw stablecoin (e.g. USDC) to user-specified external wallet address.
+- **When to use**: User says withdraw, transfer out.
+- **Params**: Per MCP server schema; often amount, address, chain/asset; pass `{}` if none.
+- **Example**: `call genalpha_withdraw_to_wallet --params '{"amount":"100","address":"0x...","asset":"USDC"}'` (param names per server).
 
-**触发词**：提取、withdraw、转账
+### genalpha_ensure_gas
 
-**示例**：
-- "提取100 USDC到我的钱包"
-- "转出到外部地址"
+- **Purpose**: Top up native Gas for user trading account on a given chain.
+- **When to use**: User says top up gas, ensure gas, or chain has low gas.
+- **Params**: Per MCP server schema; often `chain_id`; pass `{}` if none.
+- **Example**: `call genalpha_ensure_gas --params '{"chain_id":"solana:mainnet-beta"}'`.
 
-### 5. Gas费管理
-使用AIUSD自动充值各链的原生Gas费。
+### genalpha_get_transactions
 
-**触发词**：充值gas、ensure gas、加油
+- **Purpose**: Return user transaction history (list, may include status).
+- **When to use**: User asks history, recent transactions, order status.
+- **Params** (JSON): Usually `limit` (number), e.g. 10.
+- **Example**: `call genalpha_get_transactions --params '{"limit":10}'`.
 
-**示例**：
-- "给Solana账户充值gas"
-- "确保ETH链有足够gas"
+### reauth / login (Re-authenticate)
 
-### 6. 交易记录查询
-查看历史交易记录和状态。
+- **Purpose**: Clear all cached auth and run OAuth login again.
+- **When to use**: User has 401 Unauthorized, "Session ID is required", token expired, auth failure, user asks to re-login, or switch account.
+- **Params**: None. Pass `{}`.
+- **Example**:
+  - `npm run reauth`
+  - `npm run login`
+  - `node scripts/reauth.js`
+- **Steps**:
+  1. Clear mcporter cache (`~/.mcporter/`)
+  2. Clear local token file (`~/.mcp-hub/`)
+  3. Clear other auth cache files
+  4. Start browser OAuth login
+  5. Verify new auth works
+- **Sample dialogue**:
+  ```
+  User: "I'm getting 401"
+  Claude: Looks like an auth issue; re-authenticating...
+  [Run: npm run reauth]
+  Claude: Re-auth done; you can use the skill again.
 
-**触发词**：交易记录、历史、transactions
+  User: "Re-login"
+  Claude: Clearing cache and re-logging in...
+  [Run: npm run login]
+  ```
 
-**示例**：
-- "显示最近10笔交易"
-- "查看挂单状态"
-- "我的交易历史"
+## Usage Flow (for Agent Reasoning)
 
-## 🛠 技术实现
+1. **Parse intent**: Map natural language to a tool using the "Typical user intents" column.
+2. **Prepare params**: Use `{}` for no-param tools; for others build JSON from above or `tools --detailed` schema.
+3. **Call**: Invoke the skill's call interface with tool name and params.
+4. **Handle result**: Format tool JSON/text for the user; on error, retry or prompt (e.g. auth expired → prompt re-login).
 
-### 架构特点
-- **自动会话管理**：处理MCP协议的Session ID要求
-- **Bearer token认证**：支持多种token源
-- **错误重试**：自动处理token过期和网络问题
-- **协议兼容**：完整实现MCP JSON-RPC over HTTP
+## Auth and Error Handling
 
-### 工具列表
-系统会自动调用以下MCP工具：
-- `genalpha_get_balances` - 获取账户余额
-- `genalpha_get_trading_accounts` - 获取交易账户
-- `genalpha_execute_intent` - 执行交易意图
-- `genalpha_stake_aiusd` - 质押AIUSD
-- `genalpha_unstake_aiusd` - 取消质押
-- `genalpha_withdraw_to_wallet` - 提取到钱包
-- `genalpha_ensure_gas` - 充值Gas费
-- `genalpha_get_transactions` - 获取交易记录
+### Auth error auto-fix
 
-## 🔄 使用流程
+On auth-related errors, Claude should run re-auth:
 
-### 首次使用 (零配置)
+- **401 Unauthorized** → run `npm run reauth`
+- **Session ID is required** → run `npm run reauth`
+- **Token invalid or expired** → run `npm run reauth`
+- **Auth failed** → run `npm run reauth`
+
+### Error handling flow
+
+1. **Detect auth error** → run `npm run reauth`
+2. **Business error** → relay server error to user; do not invent causes
+3. **Network/timeout** → retry once; then ask user to check network or try later
+
+### Sample error dialogue
+
 ```
-用户: "查看我的AIUSD余额"
-系统: 🚀 正在初始化AIUSD技能...
-系统: 📦 安装依赖中... ✅
-系统: 🔨 构建项目中... ✅
-系统: 🔐 设置认证中... (自动打开OAuth页面)
-系统: ✅ 认证完成，正在连接MCP服务器...
-系统: 📊 您的余额：托管账户0.00 AIUSD，质押账户20.98 sAIUSD
+User: "Check balance"
+[Tool returns 401]
+Claude: Auth expired; re-authenticating...
+[Run: npm run reauth]
+Claude: Re-auth done. Fetching balance...
+[Call: genalpha_get_balances]
 ```
 
-### 后续使用 (即时响应)
-```
-用户: "用50 USDC买SOL"
-系统: ✅ 正在执行交易...
-系统: 📈 交易已提交，交易ID：xxx
-```
+## Getting Full Schema
 
-### 自动恢复
-```
-用户: "查看交易记录"
-系统: ⚠️ 检测到认证过期，正在自动刷新...
-系统: ✅ 认证已更新，正在获取交易记录...
-```
+At runtime, get each tool's full parameter schema with:
 
-## ⚡ 特色优势
+- `aiusd-skill tools --detailed`
 
-1. **🎯 零用户干预**：自动处理依赖、构建、认证等所有设置步骤
-2. **🚀 即装即用**：解压即可使用，无需手动配置
-3. **🔐 智能认证**：自动OAuth流程，支持多种认证源
-4. **🛡️ 自愈能力**：自动检测和修复常见问题
-5. **📱 用户友好**：直观的进度提示和错误引导
-6. **🔧 生产就绪**：完整的错误处理和重试机制
-
-## 🛡️ 自动故障处理
-
-**无需手动排查** - skill会自动诊断和修复常见问题：
-
-### 自动修复能力
-- **依赖缺失** → 自动安装npm包
-- **构建失败** → 自动重新编译TypeScript
-- **认证过期** → 自动引导重新登录
-- **连接错误** → 自动重试和错误提示
-- **工具调用失败** → 智能错误分析和建议
-
-### 用户引导
-遇到无法自动修复的问题时，skill会：
-- 🎯 精确诊断问题原因
-- 📋 提供具体解决步骤
-- 🔗 显示相关链接和资源
-- ⚡ 支持一键重试
-
-## 🎉 总结
-
-这个skill实现了真正的"**即插即用**"体验：
-- **零配置需求** - 解压运行即可
-- **智能自动化** - 自动处理所有技术细节
-- **用户友好** - 专注于功能而非设置
-- **生产就绪** - 完整的MCP协议支持
-
-告别复杂的设置步骤，专注于AIUSD交易本身！
+Output includes each tool's `inputSchema`; use it to build `--params` JSON.

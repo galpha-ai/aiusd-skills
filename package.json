@@ -1,7 +1,7 @@
 {
   "name": "aiusd-skill",
   "version": "1.0.0",
-  "description": "AIUSD trading and account management skill via MCP protocol",
+  "description": "AIUSD trading and account management skill via MCP protocol. ",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
@@ -12,8 +12,13 @@
     "clean": "rm -rf dist node_modules package-lock.json",
     "install-deps": "npm install",
     "package": "npm run build && npm pack",
-    "setup": "node skill-init.js",
-    "postinstall": "node skill-init.js"
+    "build-skill": "node scripts/build-skill.js",
+    "setup": "node scripts/skill-init.js",
+    "reauth": "node scripts/reauth.js",
+    "login": "node scripts/reauth.js",
+    "test-reauth": "node scripts/test-reauth.js",
+    "show-auth": "node scripts/show-auth-locations.js",
+    "postinstall": "node scripts/skill-init.js"
   },
   "bin": {
     "aiusd-skill": "./dist/index.js"
@@ -23,8 +28,7 @@
     "src/**/*",
     "README.md",
     "SKILL.md",
-    "build.sh",
-    "test-client.sh",
+    "scripts/",
     "package.json",
     "tsconfig.json"
   ],
