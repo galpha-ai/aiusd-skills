@@ -7,14 +7,14 @@ The official AIUSD trading skill for your personal AI assistant. Trade cryptocur
 ### Step 1: Install the Skill
 
 **Option A: Drag & Drop (Easiest)**
-1. Download the skill file: [aiusd-skill-agent.skill](https://github.com/aiusd/aiusd-skill/raw/main/build/aiusd-skill-agent.skill)
+1. Download the skill file: **[Download aiusd-skill-agent.skill](https://github.com/galpha-ai/aiusd-skills/releases/download/v1.0.0/aiusd-skill-agent.skill)**
 2. Start your ClawdBot/OpenClaw assistant
 3. Open your chat (Telegram, Discord, WhatsApp, etc.)
 4. Drag and drop the downloaded `.skill` file into the chat
 5. Your bot will automatically install the skill
 
 **Option B: Manual Installation**
-1. Download and extract the skill file: [aiusd-skill-agent.skill](https://github.com/aiusd/aiusd-skill/raw/main/build/aiusd-skill-agent.skill)
+1. Download and extract the skill file: **[Download aiusd-skill-agent.skill](https://github.com/galpha-ai/aiusd-skills/releases/download/v1.0.0/aiusd-skill-agent.skill)**
 2. Extract: `tar -xzf aiusd-skill-agent.skill`
 3. Copy the extracted folder to your OpenClaw skills directory
 4. Restart your bot
@@ -131,6 +131,6 @@ Bot: 🔄 Executing trade: Buy SOL with $100 USDC...
 
 ---
 
-**Get Started**: Download the [skill file](https://github.com/aiusd/aiusd-skill/raw/main/build/aiusd-skill-agent.skill) and drop it into your bot's chat to start trading!
+**Get Started**: **[Download the skill file](https://github.com/galpha-ai/aiusd-skills/releases/download/v1.0.0/aiusd-skill-agent.skill)** and drop it into your bot's chat to start trading!
 
 **Version**: 1.0.0 | **License**: MIT | **Support**: https://aiusd.ai
