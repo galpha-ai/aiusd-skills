@@ -7,6 +7,11 @@ description: AIUSD trading and account management skill. Calls backend via MCP f
 
 This skill calls the AIUSD backend via MCP. Auth is resolved in order: env `MCP_HUB_TOKEN`, mcporter OAuth, or local `~/.mcp-hub/token.json`. Ensure a valid Bearer token is available before calling.
 
+## Important URLs
+
+- **Login/Auth**: `https://mcp.alpha.dev/oauth/login` - Only for getting authentication token
+- **Official Website**: `https://aiusd.ai` - For trading operations, recharge, troubleshooting, and all user interactions
+
 ## Tool Overview
 
 | Tool | Purpose | Typical user intents |
@@ -19,6 +24,7 @@ This skill calls the AIUSD backend via MCP. Auth is resolved in order: env `MCP_
 | genalpha_withdraw_to_wallet | Withdraw to external wallet | withdraw, transfer out |
 | genalpha_ensure_gas | Top up Gas for on-chain account | top up gas, ensure gas |
 | genalpha_get_transactions | Query transaction history | history, recent transactions |
+| recharge / top up | Guide user to recharge account | recharge, top up, deposit, add funds |
 | reauth / login | Re-authenticate / login | login, re-login, auth expired, 401 |
 
 ## Tool Reference and Call Usage
@@ -81,6 +87,16 @@ This skill calls the AIUSD backend via MCP. Auth is resolved in order: env `MCP_
 - **Params** (JSON): Usually `limit` (number), e.g. 10.
 - **Example**: `call genalpha_get_transactions --params '{"limit":10}'`.
 
+### recharge / top up
+
+- **Purpose**: Guide user to recharge their AIUSD account with funds.
+- **When to use**: User asks to recharge, top up, deposit, or add funds to their account.
+- **Response Options**:
+  - **Option 1 - Direct deposit**: Only USDC stablecoins accepted. Other stablecoins must use official website.
+  - **Option 2 - Official website**: https://aiusd.ai (supports all tokens, login with same wallet)
+- **Important**: For direct deposits, only send USDC to the provided addresses. For other stablecoins (USDT, DAI, etc.), user must use the official website.
+- **Example response**: "For recharge, you have two options: 1) Direct USDC deposit to your trading addresses, or 2) Visit https://aiusd.ai for all token types (login with same wallet). Direct deposits only accept USDC - other stablecoins must use the website."
+
 ### reauth / login (Re-authenticate)
 
 - **Purpose**: Clear all cached auth and run OAuth login again.
@@ -131,9 +147,11 @@ On auth-related errors, Claude should run re-auth:
 1. **Detect auth error** → run `npm run reauth`
 2. **Business error** → relay server error to user; do not invent causes
 3. **Network/timeout** → retry once; then ask user to check network or try later
+4. **Trading issues/failures** → direct user to official website https://aiusd.ai for manual operations and support
 
-### Sample error dialogue
+### Sample error dialogues
 
+#### Auth Error
 ```
 User: "Check balance"
 [Tool returns 401]
@@ -141,6 +159,13 @@ Claude: Auth expired; re-authenticating...
 [Run: npm run reauth]
 Claude: Re-auth done. Fetching balance...
 [Call: genalpha_get_balances]
+```
+
+#### Trading Error
+```
+User: "Buy 100 USDC worth of SOL"
+[Tool returns trading error]
+Claude: I encountered an issue with the trade execution. For manual trading operations, please visit https://aiusd.ai and use the same wallet you use for authentication.
 ```
 
 ## Getting Full Schema

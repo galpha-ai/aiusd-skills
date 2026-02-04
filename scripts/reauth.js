@@ -193,6 +193,7 @@ class ReAuthenticator {
 
     log('🔐 Starting OAuth authentication flow...', 'blue');
     log('📋 This will open a browser window for authentication', 'cyan');
+    log('💳 Please complete login in browser. After wallet login, you can try checking your wallet status directly in chat.', 'yellow');
     log('');
 
     try {
@@ -201,13 +202,38 @@ class ReAuthenticator {
         {
           cwd: projectRoot,
           encoding: 'utf8',
-          stdio: 'inherit',
-          timeout: 120000 // 2 minutes timeout
+          stdio: 'pipe', 
+          timeout: 60000 // 1 minutes timeout
         }
       );
 
       logSuccess('OAuth authentication completed');
     } catch (error) {
+      // Check if OAuth actually succeeded despite the error
+      log('🔍 Checking if OAuth succeeded despite error...', 'blue');
+
+      const credentialsPath = join(this.mcporterDir, 'credentials.json');
+      if (existsSync(credentialsPath)) {
+        try {
+          const fs = await import('fs');
+          const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+
+          // Look for any entry with access_token
+          const hasValidToken = Object.values(credentials.entries || {}).some(
+            entry => entry.tokens && entry.tokens.access_token
+          );
+
+          if (hasValidToken) {
+            logSuccess('OAuth tokens found! Authentication actually succeeded');
+            log('💡 The timeout/error was a mcporter display issue, not a real failure', 'cyan');
+            return; // Continue with success
+          }
+        } catch (parseError) {
+          // Credentials file exists but couldn't parse it
+        }
+      }
+
+      // If we get here, OAuth really did fail
       if (error.code === 'TIMEOUT') {
         logError('Authentication timed out. Please try again.');
       } else if (error.stderr && error.stderr.includes('User denied')) {

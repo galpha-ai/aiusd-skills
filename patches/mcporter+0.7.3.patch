@@ -1,0 +1,165 @@
+diff --git a/node_modules/mcporter/dist/oauth.js b/node_modules/mcporter/dist/oauth.js
+index d0dc28a..a76416a 100644
+--- a/node_modules/mcporter/dist/oauth.js
++++ b/node_modules/mcporter/dist/oauth.js
+@@ -131,7 +131,159 @@ class PersistentOAuthClientProvider {
+                     this.logger.info(`Received OAuth authorization code for ${this.definition.name}`);
+                     res.statusCode = 200;
+                     res.setHeader('Content-Type', 'text/html');
+-                    res.end('<html><body><h1>Authorization successful</h1><p>You can return to the CLI.</p></body></html>');
++                    res.end(`<html>
++<head>
++    <title>Authorization Successful</title>
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <style>
++        * {
++            margin: 0;
++            padding: 0;
++            box-sizing: border-box;
++        }
++        body {
++            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
++            background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 50%, #262626 100%);
++            min-height: 100vh;
++            display: flex;
++            justify-content: center;
++            align-items: center;
++            color: #ffffff;
++            position: relative;
++            overflow: hidden;
++        }
++        body::before {
++            content: '';
++            position: absolute;
++            top: -50%;
++            left: -50%;
++            width: 200%;
++            height: 200%;
++            background: radial-gradient(circle at center, rgba(255,255,255,0.03) 0%, transparent 70%);
++            animation: float 20s infinite linear;
++        }
++        @keyframes float {
++            0% { transform: rotate(0deg); }
++            100% { transform: rotate(360deg); }
++        }
++        .container {
++            background: rgba(30, 30, 30, 0.95);
++            backdrop-filter: blur(20px);
++            border: 1px solid rgba(255, 255, 255, 0.1);
++            border-radius: 20px;
++            padding: 3rem 2.5rem;
++            text-align: center;
++            box-shadow:
++                0 20px 60px rgba(0, 0, 0, 0.5),
++                0 0 0 1px rgba(255, 255, 255, 0.05),
++                inset 0 1px 0 rgba(255, 255, 255, 0.1);
++            max-width: 440px;
++            width: 90%;
++            position: relative;
++            z-index: 1;
++        }
++        h1 {
++            color: #ffffff;
++            margin-bottom: 1rem;
++            font-size: 1.75rem;
++            font-weight: 700;
++            letter-spacing: -0.025em;
++            background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
++            background-clip: text;
++            -webkit-background-clip: text;
++            -webkit-text-fill-color: transparent;
++        }
++        p {
++            color: #b0b0b0;
++            margin-bottom: 2rem;
++            font-size: 1rem;
++            line-height: 1.6;
++            font-weight: 400;
++        }
++        .status-info {
++            background: linear-gradient(135deg, rgba(45, 45, 45, 0.8) 0%, rgba(35, 35, 35, 0.9) 100%);
++            border-radius: 12px;
++            padding: 1.5rem;
++            margin: 2rem 0;
++            border: 1px solid rgba(255, 255, 255, 0.08);
++            position: relative;
++            overflow: hidden;
++        }
++        .status-info::before {
++            content: '';
++            position: absolute;
++            top: 0;
++            left: 0;
++            right: 0;
++            height: 2px;
++            background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.2) 50%, transparent 100%);
++        }
++        .status-info strong {
++            color: #ffffff;
++            display: block;
++            margin-bottom: 0.5rem;
++            font-size: 1.1rem;
++            font-weight: 600;
++        }
++        .close-instruction {
++            background: rgba(20, 20, 20, 0.6);
++            color: #d0d0d0;
++            padding: 1.2rem;
++            border-radius: 10px;
++            font-size: 0.9rem;
++            margin-top: 2rem;
++            border: 1px solid rgba(255, 255, 255, 0.06);
++            font-weight: 500;
++        }
++        .footer-link {
++            margin-top: 1.5rem;
++            padding-top: 1.5rem;
++            border-top: 1px solid rgba(255, 255, 255, 0.06);
++        }
++        .footer-link a {
++            color: #8bb8ff;
++            text-decoration: none;
++            font-size: 0.9rem;
++            font-weight: 500;
++            transition: all 0.3s ease;
++            position: relative;
++        }
++        .footer-link a:hover {
++            color: #b3d1ff;
++            transform: translateY(-1px);
++        }
++        .footer-link a::after {
++            content: '';
++            position: absolute;
++            bottom: -2px;
++            left: 0;
++            width: 0;
++            height: 1px;
++            background: #8bb8ff;
++            transition: width 0.3s ease;
++        }
++        .footer-link a:hover::after {
++            width: 100%;
++        }
++    </style>
++</head>
++<body>
++    <div class="container">
++        <h1>Authorization Successful</h1>
++        <p>Authentication has been completed successfully.</p>
++        <div class="status-info">
++            <strong>Connected</strong>
++            You can now return to the application to continue.
++        </div>
++        <div class="close-instruction">
++            You can now close this window.
++        </div>
++        <div class="footer-link">
++            <a href="https://aiusd.ai" target="_blank">Visit AIUSD.ai</a>
++        </div>
++    </div>
++</body>
++</html>`);
+                     this.authorizationDeferred?.resolve(code);
+                     this.authorizationDeferred = null;
+                 }

@@ -20,6 +20,7 @@ const colors = {
   yellow: '\x1b[33m',
   red: '\x1b[31m',
   magenta: '\x1b[35m',
+  cyan: '\x1b[36m',
   reset: '\x1b[0m'
 };
 
@@ -69,6 +70,7 @@ async function buildSkill() {
       'scripts/',
       'dist/',
       'src/',
+      'patches/',
       'tsconfig.json'
     ];
 

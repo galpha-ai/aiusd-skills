@@ -107,3 +107,4 @@ credentials.json
 *.skill
 
 dist/
+scripts/reauth.js

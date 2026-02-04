@@ -36,7 +36,7 @@ npm run setup
 
 ### Method 1: Environment Variable (Simplest)
 ```bash
-# Get your token from: https://chatgpt.dev.alpha.dev/oauth/login
+# Get your token from: https://mcp.alpha.dev/oauth/login
 export MCP_HUB_TOKEN="Bearer your_jwt_token_here"
 
 # Test the connection

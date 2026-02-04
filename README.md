@@ -1,304 +1,136 @@
-# AIUSD Skill - Official MCP TypeScript Client
+# AIUSD Skill for OpenClaw/ClawdBot
 
-Full AIUSD MCP (Model Context Protocol) skill package using the official TypeScript SDK, resolving the 401 "Session ID is required" issue.
+The official AIUSD trading skill for your personal AI assistant. Trade cryptocurrencies, check balances, and manage your AIUSD account through natural language conversations in Telegram, Discord, WhatsApp, or any platform your bot supports.
 
-## What This Solves
+## 🚀 Quick Start
 
-- **Correct MCP implementation** – Official SDK, automatic initialize handshake and Session ID handling
-- **Bearer token auth** – Multiple token sources with priority
-- **Unified toolchain** – Node.js only, no Python
-- **Type safety** – Full TypeScript
-- **Production ready** – Officially maintained, protocol-compatible
+### Step 1: Install the Skill
 
-## Quick Start
+**Option A: Drag & Drop (Easiest)**
+1. Download the skill file: [aiusd-skill-agent.skill](https://github.com/aiusd/aiusd-skill/raw/main/build/aiusd-skill-agent.skill)
+2. Start your ClawdBot/OpenClaw assistant
+3. Open your chat (Telegram, Discord, WhatsApp, etc.)
+4. Drag and drop the downloaded `.skill` file into the chat
+5. Your bot will automatically install the skill
 
-### 1. Install dependencies
+**Option B: Manual Installation**
+1. Download and extract the skill file: [aiusd-skill-agent.skill](https://github.com/aiusd/aiusd-skill/raw/main/build/aiusd-skill-agent.skill)
+2. Extract: `tar -xzf aiusd-skill-agent.skill`
+3. Copy the extracted folder to your OpenClaw skills directory
+4. Restart your bot
 
-```bash
-# Build the project
-npm install
-npm run build
+### Step 2: Authentication Setup
 
-# Package as .skill file
-npm run build-skill
-```
+The bot will automatically handle authentication when you first use AIUSD features. If automatic login fails, simply tell your bot: *"re-login"* in the chat.
 
-### 2. Set up auth (choose one)
+### Step 3: Start Trading!
 
-#### Method A: Environment variable (simplest)
-```bash
-# Get token from https://chatgpt.dev.alpha.dev/oauth/login
-export MCP_HUB_TOKEN="Bearer eyJ..."
-```
+Now you can talk to your bot naturally:
 
-#### Method B: mcporter (recommended)
-```bash
-# Use mcporter directly (recommended)
-npx mcporter list --http-url https://mcp.alpha.dev/api/mcp-hub/mcp --name aiusd
+- *"What's my AIUSD balance?"*
+- *"Buy $100 worth of SOL with USDC"*
+- *"Show my recent transactions"*
+- *"What are my trading addresses?"*
 
-# Or install mcporter first
-npm install -g mcporter
-mcporter list --http-url https://mcp.alpha.dev/api/mcp-hub/mcp --name aiusd
-```
+## 💬 What You Can Ask Your Bot
 
-#### Re-login (clear cache)
-If you hit auth issues or need to switch accounts:
-```bash
-# Clear all cache and re-login
-npm run reauth
-# or
-npm run login
+### Check Balance & Accounts
+- *"Check my AIUSD balance"*
+- *"How much do I have in my account?"*
+- *"What's my total portfolio value?"*
+- *"Show me my trading addresses"*
 
-# Or run script directly
-node scripts/reauth.js
-```
+### Execute Trades
+- *"Buy $50 of SOL with USDC"*
+- *"Sell 100 USDC for ETH"*
+- *"Swap 0.1 ETH to SOL"*
+- *"Trade 1000 USDC for BTC"*
 
-**Re-login clears:**
-- mcporter cache (`~/.mcporter/`)
-- Local token file (`~/.mcp-hub/`)
-- Other auth cache files
-- Then runs a fresh OAuth flow
+### Staking Operations
+- *"Stake 500 AIUSD"*
+- *"Unstake my AIUSD"*
+- *"How much am I earning from staking?"*
 
-#### Method C: CLI argument
-```bash
-aiusd-skill --token "Bearer eyJ..." tools
-```
+### Transaction History
+- *"Show my last 10 transactions"*
+- *"What trades did I make today?"*
+- *"Check my transaction history"*
 
-### 3. Basic usage
+### Account Management
+- *"Withdraw 100 USDC to my wallet"*
+- *"Top up gas for Solana"*
+- *"Ensure I have enough gas"*
 
-```bash
-# Test connection
-npm run test
-# or aiusd-skill test
+### Deposits & Recharge
+- *"How can I add funds to my account?"*
+- *"I want to deposit money"*
+- *"Where can I recharge?"*
 
-# Re-login (if auth issues)
-npm run reauth
+## 💰 Adding Funds to Your Account
 
-# List all tools
-aiusd-skill tools
+Your bot will guide you through two deposit options:
 
-# Get account balance
-aiusd-skill balances
+### Option 1: Direct USDC Deposit
+- **USDC only** - other coins not supported for direct deposit
+- Ask your bot: *"What are my deposit addresses?"*
+- Send USDC to your Solana or EVM trading address
 
-# Get trading accounts
-aiusd-skill accounts
+### Option 2: All Coins via Website
+- Visit **https://aiusd.ai**
+- Login with the same wallet you use for trading
+- Supports all stablecoins (USDT, DAI, BUSD, etc.)
 
-# Transaction history
-aiusd-skill transactions --limit 5
+**Important**: For coins other than USDC, you must use the website - direct deposits only accept USDC.
 
-# Call a tool directly
-aiusd-skill call genalpha_get_balances
-```
+## ⚙️ Supported Platforms
 
-## Command reference
+This skill works with OpenClaw/ClawdBot on:
+- **Telegram** - Private chats and groups
+- **Discord** - Direct messages and server channels
+- **WhatsApp** - Personal and business accounts
+- **Slack** - Workspaces and direct messages
+- **SMS** - Text message interface
+- **CLI** - Command line interface
 
-### Global options
-```bash
--s, --server <url>     MCP server URL (default: https://mcp.alpha.dev/api/mcp-hub/mcp)
--t, --token <token>    Bearer token
---timeout <ms>         Request timeout (default: 30000ms)
---help                 Show help
---version              Show version
-```
+## 🔒 Privacy & Security
 
-### Commands
+- **Local First**: Your bot runs locally, your data stays private
+- **Secure Storage**: Authentication tokens stored locally on your device
+- **No Data Sharing**: AIUSD skill only communicates with official AIUSD servers
+- **Open Source**: Skill code is transparent and auditable
 
-#### `test` – Test connection
-```bash
-aiusd-skill test
-```
-
-#### `tools` – List tools
-```bash
-aiusd-skill tools                 # Short list
-aiusd-skill tools --detailed      # With details
-```
-
-#### `call` – Call a tool
-```bash
-# Basic call
-aiusd-skill call genalpha_get_balances
-
-# With params
-aiusd-skill call genalpha_execute_intent \
-  --params '{"chain_id":"solana:mainnet-beta", "intent":"<buy>...</buy>"}'
-
-# Pretty output
-aiusd-skill call genalpha_get_balances --pretty
-```
-
-#### Shortcuts
-```bash
-aiusd-skill balances              # Get balance
-aiusd-skill accounts              # Get accounts
-aiusd-skill transactions -l 10    # Last 10 transactions
-```
-
-## Project structure
+## 📱 Example Conversation
 
 ```
-src/
-├── index.ts           # Entry and error handling
-├── cli.ts             # CLI
-├── mcp-client.ts      # MCP client (official SDK)
-└── token-manager.ts   # Token and multi-source support
+You: Hey bot, what's my AIUSD balance?
 
-dist/                  # Build output
-package.json           # Project config
-tsconfig.json          # TypeScript config
-build.sh               # Build script
-test-client.sh         # Test script
+Bot: 🔍 Checking your AIUSD account...
+
+✅ Your AIUSD Balance:
+• Custody Account: 1,250.75 AIUSD
+• Staking Account: 2,500.00 sAIUSD
+• Total Value: $3,750.75 USD
+
+You: Buy $100 worth of SOL with USDC
+
+Bot: 🔄 Executing trade: Buy SOL with $100 USDC...
+
+✅ Trade completed successfully!
+• Bought: 0.234 SOL
+• Spent: $100.00 USDC
+• Transaction ID: abc123...
 ```
 
-## Auth configuration
+## 🌟 Why Use This Skill?
 
-### Token source priority
-1. **CLI** – `--token "Bearer xxx"`
-2. **Env** – `MCP_HUB_TOKEN` or `AIUSD_TOKEN`
-3. **mcporter** – Auto-detect mcporter auth
-4. **Local files**:
-   - `~/.mcp-hub/token.json`
-   - `~/.mcporter/auth.json`
+- **Natural Language**: No complex commands - just talk normally
+- **Real-time**: Instant balance checks and trade execution
+- **Multi-platform**: Works wherever your bot is available
+- **Secure**: OAuth authentication with official AIUSD servers
+- **Comprehensive**: Full trading, staking, and account management
 
-### Getting a token
-Visit https://chatgpt.dev.alpha.dev/oauth/login to complete OAuth and copy the JWT token.
+---
 
-## Development and testing
+**Get Started**: Download the [skill file](https://github.com/aiusd/aiusd-skill/raw/main/build/aiusd-skill-agent.skill) and drop it into your bot's chat to start trading!
 
-### Build
-```bash
-./build.sh                    # Full build and verify
-npm run build                 # Compile only
-npm run dev                   # Dev mode
-```
-
-### Run tests
-```bash
-./test-client.sh              # Full test suite
-npm test                      # Basic connection test
-npm run build && node dist/index.js --help  # Manual check
-```
-
-### Global install
-```bash
-npm install -g .
-aiusd-client --help           # Global command
-```
-
-## Comparison with previous approach
-
-| Feature | Hand-written | Official SDK |
-|--------|---------------|--------------|
-| **Protocol** | May be incomplete | Officially supported |
-| **Session** | Manual | Auto-handled |
-| **Errors** | Custom | Standardized |
-| **Maintenance** | High | Low |
-| **Types** | Partial | Full |
-| **Dependencies** | Manual | npm ecosystem |
-
-## Example success output
-
-```bash
-$ aiusd-skill test
-ℹ️ Testing connection to MCP server...
-✅ Authentication token found
-🔄 Connecting to MCP server: https://mcp.alpha.dev/api/mcp-hub/mcp
-✅ Successfully connected to MCP server
-✅ Connection test successful
-
-📋 Connection Info:
-{
-  "connected": true,
-  "serverUrl": "https://mcp.alpha.dev/api/mcp-hub/mcp",
-  "client": "aiusd-skills v1.0.0"
-}
-✅ Disconnected from MCP server
-
-$ aiusd-skill balances --pretty
-✅ Authentication token found
-🔄 Connecting to MCP server: https://mcp.alpha.dev/api/mcp-hub/mcp
-✅ Successfully connected to MCP server
-ℹ️ Calling tool: genalpha_get_balances
-🔄 Calling tool: genalpha_get_balances
-✅ Tool 'genalpha_get_balances' executed successfully
-
-📋 Tool Result:
-{
-  "balances": {
-    "custody": "4837.69 AIUSD",
-    "staking": "5892.50 sAIUSD",
-    "total_value_usd": "10730.19"
-  }
-}
-```
-
-## Working with mcporter
-
-This client works with mcporter:
-
-1. **mcporter** – OAuth and tool invocation
-2. **aiusd-client** – CLI and automatic token detection
-
-### Using mcporter
-```bash
-# Call a tool
-npx mcporter call --http-url https://mcp.alpha.dev/api/mcp-hub/mcp --name aiusd.genalpha_get_balances
-
-# List tools
-npx mcporter list --http-url https://mcp.alpha.dev/api/mcp-hub/mcp --name aiusd
-```
-
-## Build and distribution
-
-### Package as Skill
-
-```bash
-# Build and package as .skill file
-npm run build-skill
-```
-
-This produces:
-- `build/aiusd-skill-agent.skill` – Full skill package
-- `build/build-info.json` – Build metadata
-- `build/README.md` – Distribution notes
-
-### Directory layout
-
-```
-aiusd-skills/
-├── src/                        # TypeScript source
-├── dist/                       # Compiled JS
-├── build/                      # Final artifacts (can commit)
-│   ├── aiusd-skill-agent.skill # Skill package
-│   ├── build-info.json        # Metadata
-│   └── README.md               # Distribution notes
-├── scripts/                    # Build and tool scripts
-└── docs/                       # Documentation
-```
-
-### Using the packaged Skill
-
-```bash
-# Extract skill package
-tar -xzf build/aiusd-skill-agent.skill
-
-# Or copy to target
-cp build/aiusd-skill-agent.skill /path/to/claude-code/skills/
-```
-
-**build/ directory:**
-- Can be committed to Git (versioning and distribution)
-- Can include full node_modules (zero-dependency run)
-- Self-contained (no extra install steps)
-- Suitable for CI/CD and automated distribution
-
-### Two client options
-```bash
-# mcporter (direct tool call)
-npx mcporter call --http-url https://mcp.alpha.dev/api/mcp-hub/mcp --name aiusd.genalpha_get_balances
-
-# This client (CLI)
-aiusd-skill balances --pretty
-```
-
-This implementation uses the official SDK to address the technical requirements while keeping long-term maintainability and protocol compatibility.
+**Version**: 1.0.0 | **License**: MIT | **Support**: https://aiusd.ai

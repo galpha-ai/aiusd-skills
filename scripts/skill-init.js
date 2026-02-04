@@ -175,7 +175,7 @@ class SkillSetup {
     log('2. Use mcporter (Recommended):', 'blue');
     log('   npx mcporter list --http-url https://mcp.alpha.dev/api/mcp-hub/mcp --name aiusd', 'cyan');
     log('');
-    log('3. Get token from: https://chatgpt.dev.alpha.dev/oauth/login', 'blue');
+    log('3. Get token from: https://mcp.alpha.dev/oauth/login', 'blue');
     log('');
   }
 

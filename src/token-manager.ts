@@ -188,7 +188,7 @@ export class TokenManager {
     console.log('4. CLI argument:');
     console.log('   aiusd-client --token "Bearer your_token_here" tools');
     console.log('');
-    console.log('To get a token, visit: https://chatgpt.dev.alpha.dev/oauth/login');
+    console.log('To get a token, visit: https://mcp.alpha.dev/oauth/login');
   }
 
   /**

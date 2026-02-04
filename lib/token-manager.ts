@@ -160,7 +160,7 @@ export class TokenManager {
    mkdir -p ~/.mcp-hub
    echo '{"token": "Bearer your_token_here", "timestamp": ${Math.floor(Date.now() / 1000)}, "expires_in": 86400}' > ~/.mcp-hub/token.json
 
-To get a token, visit: https://chatgpt.dev.alpha.dev/oauth/login`;
+To get a token, visit: https://mcp.alpha.dev/oauth/login`;
   }
 
   /**

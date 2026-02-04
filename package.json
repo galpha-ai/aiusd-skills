@@ -18,7 +18,7 @@
     "login": "node scripts/reauth.js",
     "test-reauth": "node scripts/test-reauth.js",
     "show-auth": "node scripts/show-auth-locations.js",
-    "postinstall": "node scripts/skill-init.js"
+    "postinstall": "patch-package && node scripts/skill-init.js"
   },
   "bin": {
     "aiusd-skill": "./dist/index.js"
@@ -26,6 +26,7 @@
   "files": [
     "dist/**/*",
     "src/**/*",
+    "patches/",
     "README.md",
     "SKILL.md",
     "scripts/",
@@ -35,17 +36,27 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.0",
     "commander": "^12.0.0",
+    "mcporter": "^0.7.3",
     "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "patch-package": "^8.0.1",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": ["mcp", "aiusd", "trading", "skill", "typescript", "blockchain", "defi"],
+  "keywords": [
+    "mcp",
+    "aiusd",
+    "trading",
+    "skill",
+    "typescript",
+    "blockchain",
+    "defi"
+  ],
   "author": "AIUSD Team",
   "license": "MIT",
   "repository": {
