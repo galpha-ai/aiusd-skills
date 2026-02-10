@@ -108,3 +108,4 @@ credentials.json
 
 dist/
 scripts/reauth.js
+.claude/settings.local.json

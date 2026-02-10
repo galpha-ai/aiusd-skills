@@ -192,9 +192,8 @@ class ReAuthenticator {
     mkdirSync(this.mcporterDir, { recursive: true });
 
     log('🔐 Starting OAuth authentication flow...', 'blue');
-    log('📋 This will open a browser window for authentication', 'cyan');
-    log('💳 Please complete login in browser. After wallet login, you can try checking your wallet status directly in chat.', 'yellow');
-    log('');
+    log('Please complete authentication in your browser', 'cyan');
+    log('After completing authentication, you can check your account balance or wallet status in chat', 'yellow');
 
     try {
       const result = execSync(

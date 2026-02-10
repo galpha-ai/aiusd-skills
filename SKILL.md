@@ -1,6 +1,7 @@
 ---
 name: aiusd-skill
-description: AIUSD trading and account management skill. Calls backend via MCP for balance, trading, staking, withdraw, gas top-up, and transaction history. Auth priority: MCP_HUB_TOKEN env, then mcporter OAuth or local token file.
+description: "AIUSD trading and account management skill for cryptocurrency trading and account management."
+license: MIT
 ---
 
 # AIUSD Skill (Agent Reference)
@@ -9,12 +10,42 @@ This skill calls the AIUSD backend via MCP. Auth is resolved in order: env `MCP_
 
 ## ⚠️ Agent Output Guidelines
 
-**IMPORTANT**: When responding to users, agents MUST NOT include the following phrases or terms:
-- "buy template" or "trading template" references
-- "skill verification" or similar verification terminology
-- Template-related language when describing trading actions
+**CRITICAL - ABSOLUTELY FORBIDDEN PHRASES**:
+Agents must NEVER use these words or phrases when responding to users:
 
-Use natural, direct language to describe trading operations and system status.
+**TEMPLATE-RELATED (COMPLETELY BANNED)**:
+- "template" (any form: template, templates)
+- "example" (when referring to trading examples: Example 1, Example 12, etc.)
+- "pattern" (when referring to trading patterns)
+- "using template", "get template", "trading template", "buy template"
+- "use Example [number]", "based on template", "following template"
+
+**VERIFICATION-RELATED (COMPLETELY BANNED)**:
+- "skill verification", "verification"
+
+**WHAT TO SAY INSTEAD**:
+- Instead of "using template": say "executing the trade" or "placing the order"
+- Instead of "get template": say "preparing the trade" or "setting up the order"
+- Instead of "Example 12 template": say "the trade configuration" or simply describe the action
+
+**ZERO TOLERANCE**: Any use of the word "template" in trading contexts is STRICTLY PROHIBITED.
+
+**Authentication Response Guidelines**:
+**CRITICAL**: When users request re-authentication, respond ONLY with:
+- "Please complete authentication in your browser"
+- "If browser doesn't open automatically, please type 'reauth' again"
+- "After completing authentication, you can check your account balance or wallet status in chat"
+
+**STRICTLY FORBIDDEN**:
+- Do NOT include numbered steps like "1. Open page: [URL]", "2. Connect wallet", etc.
+- Do NOT mention any specific URLs in the response (URLs may be incorrect)
+- Do NOT say "waiting for authentication completion" or similar waiting phrases
+- Do NOT provide detailed step-by-step browser instructions
+- Do NOT create bulleted lists of authentication steps
+- Do NOT say phrases like "browser has been opened for you", "please complete the following steps in browser"
+- Simply guide them to the browser and mention what they can do after completion
+
+Use natural, direct language to describe trading operations and system status. Simply describe what the trade will do without referencing templates or examples.
 
 ## Important URLs
 
