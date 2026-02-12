@@ -65,7 +65,7 @@ async function buildShellInstaller() {
     }
     mkdirSync(tempDir, { recursive: true });
 
-    // Copy essential files
+    // Copy essential files (include patches/ for patch-package on npm install)
     const filesToInclude = [
       'package.json',
       'README.md',
@@ -73,6 +73,7 @@ async function buildShellInstaller() {
       'scripts/',
       'dist/',
       'src/',
+      'patches/',
       'tsconfig.json'
     ];
 
@@ -217,10 +218,36 @@ ${packageData}`;
     // Cleanup
     rmSync(tempDir, { recursive: true });
 
-    // Step 7: Show results
-    const stats = execSync(`ls -lh "${installerPath}" | awk '{print $5}'`, {
-      encoding: 'utf8'
-    }).trim();
+    // Step 7: Copy README.md and SKILL.md to build/ and write build-info.json (both installers)
+    const copyToBuild = (file) => {
+      const src = join(projectRoot, file);
+      const dest = join(buildOutputDir, file);
+      if (existsSync(src)) {
+        writeFileSync(dest, readFileSync(src, 'utf8'));
+        log(`📄 Updated build/${file}`, 'cyan');
+      }
+    };
+    copyToBuild('README.md');
+    copyToBuild('SKILL.md');
+    const installers = [];
+    const jsInstaller = join(buildOutputDir, 'aiusd-skill-installer.js');
+    const shInstaller = join(buildOutputDir, 'aiusd-skill-installer.sh');
+    if (existsSync(jsInstaller)) {
+      const s = execSync(`ls -lh "${jsInstaller}" | awk '{print $5}'`, { encoding: 'utf8' }).trim();
+      installers.push({ name: 'aiusd-skill-installer.js', size: s });
+    }
+    const shStats = execSync(`ls -lh "${installerPath}" | awk '{print $5}'`, { encoding: 'utf8' }).trim();
+    installers.push({ name: 'aiusd-skill-installer.sh', size: shStats });
+    const buildInfo = {
+      version: packageJson.version,
+      buildTime: new Date().toISOString(),
+      installers
+    };
+    writeFileSync(join(buildOutputDir, 'build-info.json'), JSON.stringify(buildInfo, null, 2));
+    log('📝 Updated build/build-info.json', 'cyan');
+
+    // Step 8: Show results
+    const stats = shStats;
 
     log('', 'reset');
     log('🎉 Shell installer built successfully!', 'green');

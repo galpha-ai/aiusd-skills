@@ -13,7 +13,14 @@ The official AIUSD trading skill for your personal AI assistant. Trade cryptocur
 4. Drag and drop the downloaded `.skill` file into the chat
 5. Your bot will automatically install the skill
 
-**Option B: Manual Installation**
+**Option B: npx (one command)**
+```bash
+npx aiusd-skills install
+cd aiusd-skill && npm run reauth
+```
+Then point your OpenClaude/skill runner at the `aiusd-skill` directory.
+
+**Option C: Manual Installation**
 1. Download and extract the skill file: **[Download aiusd-skill-agent.skill](https://github.com/galpha-ai/aiusd-skills/releases/download/v1.0.0/aiusd-skill-agent.skill)**
 2. Extract: `tar -xzf aiusd-skill-agent.skill`
 3. Copy the extracted folder to your OpenClaw skills directory

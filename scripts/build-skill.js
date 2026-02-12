@@ -129,7 +129,19 @@ async function buildSkill() {
       log('   Failed to list build contents', 'red');
     }
 
-    // Step 9: Create build info file
+    // Step 9: Copy README.md and SKILL.md to build/ (same as build-installers)
+    const copyToBuild = (file) => {
+      const src = join(projectRoot, file);
+      const dest = join(buildOutputDir, file);
+      if (existsSync(src)) {
+        writeFileSync(dest, readFileSync(src, 'utf8'));
+        log(`📄 Updated build/${file}`, 'cyan');
+      }
+    };
+    copyToBuild('README.md');
+    copyToBuild('SKILL.md');
+
+    // Step 10: Create build info file
     const packageJson = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf8'));
     const buildInfo = {
       packageName,
@@ -141,7 +153,7 @@ async function buildSkill() {
 
     const buildInfoPath = join(buildOutputDir, 'build-info.json');
     writeFileSync(buildInfoPath, JSON.stringify(buildInfo, null, 2));
-    log(`📝 Created build info: build/build-info.json`, 'cyan');
+    log(`📝 Updated build/build-info.json`, 'cyan');
 
     log('', 'reset');
     log('📋 Usage:', 'yellow');

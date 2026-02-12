@@ -65,7 +65,7 @@ async function buildJSInstaller() {
     }
     mkdirSync(tempDir, { recursive: true });
 
-    // Copy essential files
+    // Copy essential files (include patches/ for patch-package on npm install)
     const filesToInclude = [
       'package.json',
       'README.md',
@@ -73,6 +73,7 @@ async function buildJSInstaller() {
       'scripts/',
       'dist/',
       'src/',
+      'patches/',
       'tsconfig.json'
     ];
 
@@ -204,10 +205,29 @@ module.exports = { install };
     // Cleanup
     rmSync(tempDir, { recursive: true });
 
-    // Step 7: Show results
-    const stats = execSync(`ls -lh "${installerPath}" | awk '{print $5}'`, {
-      encoding: 'utf8'
-    }).trim();
+    // Step 7: Copy README.md and SKILL.md to build/ and write build-info.json
+    const copyToBuild = (file) => {
+      const src = join(projectRoot, file);
+      const dest = join(buildOutputDir, file);
+      if (existsSync(src)) {
+        writeFileSync(dest, readFileSync(src, 'utf8'));
+        log(`📄 Updated build/${file}`, 'cyan');
+      }
+    };
+    copyToBuild('README.md');
+    copyToBuild('SKILL.md');
+    const jsStats = execSync(`ls -lh "${installerPath}" | awk '{print $5}'`, { encoding: 'utf8' }).trim();
+    const installers = [{ name: installerFile, size: jsStats }];
+    const buildInfo = {
+      version: packageJson.version,
+      buildTime: new Date().toISOString(),
+      installers
+    };
+    writeFileSync(join(buildOutputDir, 'build-info.json'), JSON.stringify(buildInfo, null, 2));
+    log('📝 Updated build/build-info.json', 'cyan');
+
+    // Step 8: Show results
+    const stats = jsStats;
 
     log('', 'reset');
     log('🎉 JavaScript installer built successfully!', 'green');

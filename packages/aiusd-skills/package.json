@@ -1,0 +1,22 @@
+{
+  "name": "aiusd-skills",
+  "version": "1.0.0",
+  "description": "Install AIUSD skill for OpenClaude / MCP: npx aiusd-skills install",
+  "type": "commonjs",
+  "bin": {
+    "aiusd-skills": "./bin/aiusd-skills.js"
+  },
+  "files": [
+    "bin/"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["aiusd", "skill", "openclaude", "mcp", "install"],
+  "author": "AIUSD Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aiusd/aiusd-skills.git"
+  }
+}
