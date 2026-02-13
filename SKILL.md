@@ -6,7 +6,11 @@ license: MIT
 
 # AIUSD Skill (Agent Reference)
 
-This skill calls the AIUSD backend via MCP. Auth is resolved in order: env `MCP_HUB_TOKEN`, mcporter OAuth, or local `~/.mcp-hub/token.json`. Ensure a valid Bearer token is available before calling. **Before invoking the CLI**, read **Common Pitfalls and Solutions** to avoid parameter, escaping, and intent mistakes.
+This skill calls the AIUSD backend via MCP. Auth is resolved in order: env `MCP_HUB_TOKEN`, mcporter OAuth, local `~/.mcp-hub/token.json`, or `~/.mcporter/credentials.json`. Ensure a valid Bearer token is available before calling. **Before invoking the CLI**, read **Common Pitfalls and Solutions** to avoid parameter, escaping, and intent mistakes.
+
+**Authentication options** (prefer oauth):
+- **`npm run oauth`** – **Preferred**: EVM wallet flow: generates a new wallet, outputs mnemonic for user to save, signs challenge, obtains token. No browser required.
+- **`npm run reauth`** – Alternative: Browser OAuth flow: clears cache, opens browser for mcporter OAuth.
 
 ## ⚠️ Agent Output Guidelines
 
@@ -52,8 +56,41 @@ Use natural, direct language to describe trading operations and system status. S
 
 ## Important URLs
 
-- **Login/Auth**: `https://mcp.alpha.dev/oauth/login` - Only for getting authentication token
+- **Login/Auth**: `https://mcp.alpha.dev/oauth/login` - Browser OAuth (used by `npm run reauth`)
 - **Official Website**: `https://aiusd.ai` - For trading operations, recharge, troubleshooting, and all user interactions
+
+## EVM Wallet OAuth (`npm run oauth`) – Preferred
+
+Primary authentication flow using a newly generated EVM wallet. No browser required.
+
+### Flow
+
+1. **Generate wallet**: Creates a new EVM wallet (ethers.js)
+2. **Display mnemonic**: Outputs 12-word mnemonic – user MUST save it securely
+3. **Challenge**: Calls `https://production.alpha.dev/api/user-service/v1/auth/challenge` with `{ domain: "aiusd.ai", chain_id: "eip155:1", address }`
+4. **Sign**: Signs the returned `message` with the wallet (EIP-191 personal_sign)
+5. **Verify**: Calls `https://production.alpha.dev/api/user-service/v1/auth/verify` with `{ challenge_id, signature }`
+6. **Save token**: Writes `access_token` to `~/.mcp-hub/token.json` for MCP use
+
+### Usage
+
+```bash
+npm run oauth
+# or
+node scripts/oauth.js
+```
+
+### When to use
+
+- User prefers no browser / headless environment
+- User wants a dedicated wallet for the skill (separate from main wallet)
+- Browser OAuth fails (port conflicts, no GUI)
+
+### Important
+
+- **Save the mnemonic**: Required to recover the wallet. Anyone with the mnemonic controls the AIUSD account.
+- **New wallet each run**: Each `npm run oauth` creates a new wallet. To reuse, restore from saved mnemonic (not implemented in script; use reauth or manual token for existing accounts).
+- **Token storage**: Token saved to `~/.mcp-hub/token.json`; TokenManager reads it automatically.
 
 ## Common Pitfalls and Solutions
 
@@ -113,7 +150,7 @@ node dist/index.js call genalpha_get_transactions --params '{}'
 |--------|-------------------|
 | `Missing or invalid 'intent' parameter` | Check JSON structure and that `intent` is present and valid; compare with `tools --detailed`. |
 | `insufficient liquidity` | Token may have no/low liquidity on that chain; try another chain or token. |
-| `Jwt is missing` / 401 | Auth issue; run reauth (e.g. `npm run reauth` or installer’s reauth command). |
+| `Jwt is missing` / 401 | Auth issue; run `npm run oauth` (preferred) or `npm run reauth`. |
 
 ## Installation Pitfalls and Solutions
 
@@ -156,14 +193,14 @@ node dist/index.js call genalpha_get_transactions --params '{}'
 ### 5. Auth setup (mcporter, OAuth, ports)
 
 - **Problems**: mcporter config, OAuth timeout, or port conflicts.
-- **Recommended flow**: Install → build → ensure mcporter → run reauth once:
+- **Preferred – EVM wallet (no browser)**: `npm run oauth`. **Alternative – Browser OAuth**: Install → build → ensure mcporter → run reauth:
   ```bash
   cd aiusd-skill
   npm install && npm run build
   which mcporter || npm install -g mcporter
   npm run reauth
   ```
-  Or: `npx mcporter auth https://mcp.alpha.dev/api/mcp-hub/mcp`. Prefer the project’s **one-click reauth script** when provided.
+  Or: `npx mcporter auth https://mcp.alpha.dev/api/mcp-hub/mcp`.
 
 ### 6. OAuth callback / browser not opening
 
@@ -177,7 +214,7 @@ node dist/index.js call genalpha_get_transactions --params '{}'
   ```bash
   rm -rf ~/.mcporter ~/.mcp-hub
   unset MCP_HUB_TOKEN
-  npm run reauth
+  npm run oauth
   ```
 
 ### 8. Module export name (when extending the skill)
@@ -192,7 +229,7 @@ node dist/index.js call genalpha_get_transactions --params '{}'
   1. Download/unzip (or install via supported method).
   2. `npm install` (postinstall runs if configured).
   3. `npm run build`; confirm `dist/` exists.
-  4. `npm run reauth` and complete OAuth in the browser.
+  4. Run auth: `npm run oauth` (preferred) or `npm run reauth` (browser OAuth).
   5. `node dist/index.js balances` (or `aiusd-skill balances`).
   6. `node dist/index.js tools --detailed` to confirm tool list.
 
@@ -233,7 +270,7 @@ node -e "console.log(require('fs').existsSync(require('os').homedir() + '/.mcpor
 | genalpha_ensure_gas | Top up Gas for on-chain account | top up gas, ensure gas |
 | genalpha_get_transactions | Query transaction history | history, recent transactions |
 | recharge / top up | Guide user to recharge account | recharge, top up, deposit, add funds |
-| reauth / login | Re-authenticate / login | login, re-login, auth expired, 401 |
+| reauth / login / oauth | Re-authenticate / login | login, re-login, auth expired, 401 |
 
 **NOTE**: This list shows commonly available tools. NEW TOOLS may be added. Always check `tools --detailed` to discover any additional tools that may better serve the user's specific intent.
 
@@ -300,16 +337,15 @@ node -e "console.log(require('fs').existsSync(require('os').homedir() + '/.mcpor
 - **Important**: For direct deposits, only send USDC to the provided addresses. For other stablecoins (USDT, DAI, etc.), user must use the official website.
 - **Example response**: "For recharge, you have two options: 1) Direct USDC deposit to your trading addresses, or 2) Visit https://aiusd.ai for all token types (login with same wallet). Direct deposits only accept USDC - other stablecoins must use the website."
 
-### reauth / login (Re-authenticate)
+### reauth / login / oauth (Re-authenticate)
 
-- **Purpose**: Clear all cached auth and run OAuth login again.
+- **Purpose**: Obtain or refresh authentication token.
 - **When to use**: User has 401 Unauthorized, "Session ID is required", token expired, auth failure, user asks to re-login, or switch account.
 - **Params**: None. Pass `{}`.
-- **Example**:
-  - `npm run reauth`
-  - `npm run login`
-  - `node scripts/reauth.js`
-- **Steps**:
+- **Options**:
+  - **`npm run oauth`** – **Preferred**: EVM wallet flow: generates new wallet, outputs mnemonic, signs challenge, saves token to `~/.mcp-hub/token.json`. No browser.
+  - **`npm run reauth`** / **`npm run login`** – Alternative: Browser OAuth via mcporter.
+- **reauth steps**:
   1. Clear mcporter cache (`~/.mcporter/`)
   2. Clear local token file (`~/.mcp-hub/`)
   3. Clear other auth cache files
@@ -343,14 +379,16 @@ node -e "console.log(require('fs').existsSync(require('os').homedir() + '/.mcpor
 
 On auth-related errors, Claude should run re-auth:
 
-- **401 Unauthorized** → run `npm run reauth`
-- **Session ID is required** → run `npm run reauth`
-- **Token invalid or expired** → run `npm run reauth`
-- **Auth failed** → run `npm run reauth`
+- **401 Unauthorized** → run `npm run oauth` (preferred) or `npm run reauth`
+- **Session ID is required** → run `npm run oauth` (preferred) or `npm run reauth`
+- **Token invalid or expired** → run `npm run oauth` (preferred) or `npm run reauth`
+- **Auth failed** → run `npm run oauth` (preferred) or `npm run reauth`
+
+Prefer `npm run oauth`; use `npm run reauth` only when browser OAuth is required.
 
 ### Error handling flow
 
-1. **Detect auth error** → run `npm run reauth`
+1. **Detect auth error** → run `npm run oauth` (preferred) or `npm run reauth`
 2. **Business error** → relay server error to user; do not invent causes
 3. **Network/timeout** → retry once; then ask user to check network or try later
 4. **Trading issues/failures** → direct user to official website https://aiusd.ai for manual operations and support
@@ -362,7 +400,7 @@ On auth-related errors, Claude should run re-auth:
 User: "Check balance"
 [Tool returns 401]
 Claude: Auth expired; re-authenticating...
-[Run: npm run reauth]
+[Run: npm run oauth or npm run reauth]
 Claude: Re-auth done. Fetching balance...
 [Call: genalpha_get_balances]
 ```

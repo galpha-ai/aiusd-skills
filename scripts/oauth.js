@@ -1,0 +1,237 @@
+#!/usr/bin/env node
+
+/**
+ * AIUSD Skill - EVM Wallet OAuth
+ *
+ * Generates a new EVM wallet, uses it to authenticate with AIUSD via
+ * challenge/verify flow, and saves the access token for MCP calls.
+ *
+ * Flow:
+ * 1. Generate new EVM wallet (output mnemonic for user to save)
+ * 2. Call /auth/challenge with wallet address
+ * 3. Sign the challenge message with the wallet
+ * 4. Call /auth/verify with signature
+ * 5. Save access_token to ~/.mcp-hub/token.json
+ */
+
+import { Wallet } from 'ethers';
+import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { homedir } from 'os';
+import { createInterface } from 'readline';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const projectRoot = join(__dirname, '..');
+
+const CHALLENGE_URL = 'https://production.alpha.dev/api/user-service/v1/auth/challenge';
+const VERIFY_URL = 'https://production.alpha.dev/api/user-service/v1/auth/verify';
+const MCP_HUB_DIR = join(homedir(), '.mcp-hub');
+const TOKEN_FILE = join(MCP_HUB_DIR, 'token.json');
+
+const colors = {
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m',
+  bold: '\x1b[1m',
+  reset: '\x1b[0m',
+};
+
+function log(message, color = 'reset') {
+  console.log(`${colors[color]}${message}${colors.reset}`);
+}
+
+function logStep(step, message) {
+  log(`\n${step}. ${message}`, 'blue');
+}
+
+function logSuccess(message) {
+  log(`✅ ${message}`, 'green');
+}
+
+function logError(message) {
+  log(`❌ ${message}`, 'red');
+}
+
+function logWarning(message) {
+  log(`⚠️  ${message}`, 'yellow');
+}
+
+function askConfirmation(question) {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(/^y|yes$/i.test(answer.trim()));
+    });
+  });
+}
+
+async function callApi(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || data.error || `HTTP ${res.status}`);
+  }
+  return data;
+}
+
+async function run() {
+  try {
+    log('\n🔐 AIUSD Skill - EVM Wallet OAuth', 'magenta');
+    log('====================================', 'magenta');
+    log('This flow generates a new EVM wallet and uses it to authenticate with AIUSD.', 'cyan');
+
+    // Step 1: Generate wallet
+    logStep(1, 'Generating new EVM wallet');
+    const wallet = Wallet.createRandom();
+    const address = wallet.address;
+    const mnemonic = wallet.mnemonic?.phrase;
+
+    if (!mnemonic) {
+      throw new Error('Failed to generate wallet mnemonic');
+    }
+
+    log('');
+    log('⚠️  SAVE YOUR MNEMONIC SECURELY. You need it to recover this wallet.', 'yellow');
+    log('   Anyone with this mnemonic can control the wallet and your AIUSD account.', 'yellow');
+    log('');
+    log('Mnemonic (12 words):', 'bold');
+    log(`   ${mnemonic}`, 'cyan');
+    log('');
+    log('Wallet address:', 'bold');
+    log(`   ${address}`, 'cyan');
+    log('');
+
+    const confirmed = await askConfirmation('Have you saved the mnemonic? (y/n): ');
+    if (!confirmed) {
+      logWarning('Please save the mnemonic and run `npm run oauth` again.');
+      process.exit(1);
+    }
+
+    // Step 2: Call challenge API
+    logStep(2, 'Requesting auth challenge');
+    const challengeRes = await callApi(CHALLENGE_URL, {
+      domain: 'aiusd.ai',
+      chain_id: 'eip155:1',
+      address: address.toLowerCase(),
+    });
+
+    if (!challengeRes.success || !challengeRes.data) {
+      throw new Error(challengeRes.message || 'Challenge request failed');
+    }
+
+    const { challenge_id, message } = challengeRes.data;
+    logSuccess('Challenge received');
+
+    // Step 3: Sign message
+    logStep(3, 'Signing challenge message');
+    const hexSignature = await wallet.signMessage(message);
+
+    // Convert hex signature to base64 (API expects base64)
+    const sigBytes = Buffer.from(hexSignature.slice(2), 'hex');
+    const signature = sigBytes.toString('base64');
+
+    logSuccess('Message signed');
+
+    // Step 4: Call verify API
+    logStep(4, 'Verifying signature and obtaining token');
+    const verifyRes = await callApi(VERIFY_URL, {
+      challenge_id,
+      signature,
+    });
+
+    if (!verifyRes.success || !verifyRes.data?.access_token) {
+      throw new Error(verifyRes.message || 'Verify request failed');
+    }
+
+    const { access_token, expires_in } = verifyRes.data;
+    const expiresIn = expires_in ?? 86400;
+
+    logSuccess('Authentication successful');
+
+    // Step 5: Save token (clear mcporter credentials first so new token takes precedence)
+    logStep(5, 'Saving token for MCP');
+    const mcporterDir = join(homedir(), '.mcporter');
+    if (existsSync(mcporterDir)) {
+      try {
+        rmSync(mcporterDir, { recursive: true });
+        log('Cleared old mcporter credentials so new token is used', 'cyan');
+      } catch (e) {
+        logWarning(`Could not clear mcporter: ${e.message}`);
+      }
+    }
+    mkdirSync(MCP_HUB_DIR, { recursive: true });
+
+    const tokenData = {
+      token: access_token.startsWith('Bearer ') ? access_token : `Bearer ${access_token}`,
+      timestamp: Math.floor(Date.now() / 1000),
+      expires_in: expiresIn,
+    };
+
+    writeFileSync(TOKEN_FILE, JSON.stringify(tokenData, null, 2), 'utf8');
+    logSuccess(`Token saved to ${TOKEN_FILE}`);
+
+    // Verify with MCP
+    logStep(6, 'Verifying MCP connection');
+    const { execSync } = await import('child_process');
+    try {
+      execSync('node dist/index.js test', {
+        cwd: projectRoot,
+        encoding: 'utf8',
+        timeout: 15000,
+      });
+      logSuccess('MCP connection verified');
+    } catch (err) {
+      logWarning('MCP test failed; token was saved. Run `node dist/index.js test` to verify.');
+    }
+
+    log('');
+    log('🎉 OAuth completed successfully!', 'green');
+    log('💡 You can now use the skill. Token is stored in ~/.mcp-hub/token.json', 'cyan');
+    log('');
+  } catch (error) {
+    logError(`OAuth failed: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+// Help
+if (process.argv.includes('--help') || process.argv.includes('-h')) {
+  console.log(`
+🔐 AIUSD Skill - EVM Wallet OAuth
+
+Authenticate with AIUSD using a newly generated EVM wallet (no browser required).
+
+Usage:
+  node scripts/oauth.js
+  npm run oauth
+
+Flow:
+  1. Generates a new EVM wallet
+  2. Displays mnemonic - user MUST save it securely
+  3. Requests auth challenge from AIUSD
+  4. Signs challenge with the wallet
+  5. Exchanges signature for access token
+  6. Saves token to ~/.mcp-hub/token.json
+
+Important:
+  - Save the mnemonic! You need it to recover the wallet.
+  - This creates a NEW wallet each run. Use the same mnemonic to restore.
+  - Token is used for MCP calls; no browser OAuth needed.
+
+Options:
+  --help, -h    Show this help message
+`);
+  process.exit(0);
+}
+
+run().catch(console.error);
