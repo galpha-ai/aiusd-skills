@@ -3,11 +3,18 @@
 /**
  * AIUSD Skill - EVM Wallet OAuth
  *
- * Generates a new EVM wallet, uses it to authenticate with AIUSD via
- * challenge/verify flow, and saves the access token for MCP calls.
+ * Authenticates with AIUSD via challenge/verify flow using an EVM wallet.
+ * Supports both non-interactive (headless/bot) and interactive modes.
+ *
+ * Wallet sources (priority order):
+ * 1. --private-key <hex>         CLI argument
+ * 2. AIUSD_PRIVATE_KEY env var   Environment variable
+ * 3. --mnemonic <phrase>         CLI argument (restore existing wallet)
+ * 4. AIUSD_MNEMONIC env var      Environment variable
+ * 5. Generate new random wallet  (interactive mode only, skipped with --non-interactive)
  *
  * Flow:
- * 1. Generate new EVM wallet (output mnemonic for user to save)
+ * 1. Resolve or generate EVM wallet
  * 2. Call /auth/challenge with wallet address
  * 3. Sign the challenge message with the wallet
  * 4. Call /auth/verify with signature
@@ -29,6 +36,16 @@ const CHALLENGE_URL = 'https://production.alpha.dev/api/user-service/v1/auth/cha
 const VERIFY_URL = 'https://production.alpha.dev/api/user-service/v1/auth/verify';
 const MCP_HUB_DIR = join(homedir(), '.mcp-hub');
 const TOKEN_FILE = join(MCP_HUB_DIR, 'token.json');
+
+// Parse CLI flags
+const args = process.argv.slice(2);
+function getArg(name) {
+  const idx = args.indexOf(name);
+  return idx !== -1 && idx + 1 < args.length ? args[idx + 1] : null;
+}
+const NON_INTERACTIVE = args.includes('--non-interactive');
+const CLI_PRIVATE_KEY = getArg('--private-key');
+const CLI_MNEMONIC = getArg('--mnemonic');
 
 const colors = {
   red: '\x1b[31m',
@@ -84,37 +101,66 @@ async function callApi(url, body) {
   return data;
 }
 
+/**
+ * Resolve wallet from CLI args, env vars, or generate a new one.
+ * Returns { wallet, isNew, mnemonic? }
+ */
+function resolveWallet() {
+  // 1. Private key from CLI
+  const privateKey = CLI_PRIVATE_KEY || process.env.AIUSD_PRIVATE_KEY;
+  if (privateKey) {
+    const key = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
+    return { wallet: new Wallet(key), isNew: false };
+  }
+
+  // 2. Mnemonic from CLI or env
+  const mnemonic = CLI_MNEMONIC || process.env.AIUSD_MNEMONIC;
+  if (mnemonic) {
+    return { wallet: Wallet.fromPhrase(mnemonic.trim()), isNew: false };
+  }
+
+  // 3. Generate new wallet
+  const wallet = Wallet.createRandom();
+  return { wallet, isNew: true, mnemonic: wallet.mnemonic?.phrase };
+}
+
 async function run() {
   try {
     log('\n🔐 AIUSD Skill - EVM Wallet OAuth', 'magenta');
     log('====================================', 'magenta');
-    log('This flow generates a new EVM wallet and uses it to authenticate with AIUSD.', 'cyan');
 
-    // Step 1: Generate wallet
-    logStep(1, 'Generating new EVM wallet');
-    const wallet = Wallet.createRandom();
+    // Step 1: Resolve wallet
+    logStep(1, 'Resolving EVM wallet');
+    const { wallet, isNew, mnemonic } = resolveWallet();
     const address = wallet.address;
-    const mnemonic = wallet.mnemonic?.phrase;
 
-    if (!mnemonic) {
-      throw new Error('Failed to generate wallet mnemonic');
-    }
+    if (isNew) {
+      if (NON_INTERACTIVE) {
+        // Non-interactive: output mnemonic as structured JSON to stdout for the agent to capture
+        log('Generated new wallet (non-interactive mode)', 'cyan');
+        log(`Wallet address: ${address}`, 'cyan');
+        log(`Mnemonic: ${mnemonic}`, 'cyan');
+        logWarning('Save the mnemonic securely. Pass it as AIUSD_MNEMONIC env var or --mnemonic on next run to reuse this wallet.');
+      } else {
+        log('');
+        log('⚠️  SAVE YOUR MNEMONIC SECURELY. You need it to recover this wallet.', 'yellow');
+        log('   Anyone with this mnemonic can control the wallet and your AIUSD account.', 'yellow');
+        log('');
+        log('Mnemonic (12 words):', 'bold');
+        log(`   ${mnemonic}`, 'cyan');
+        log('');
+        log('Wallet address:', 'bold');
+        log(`   ${address}`, 'cyan');
+        log('');
 
-    log('');
-    log('⚠️  SAVE YOUR MNEMONIC SECURELY. You need it to recover this wallet.', 'yellow');
-    log('   Anyone with this mnemonic can control the wallet and your AIUSD account.', 'yellow');
-    log('');
-    log('Mnemonic (12 words):', 'bold');
-    log(`   ${mnemonic}`, 'cyan');
-    log('');
-    log('Wallet address:', 'bold');
-    log(`   ${address}`, 'cyan');
-    log('');
-
-    const confirmed = await askConfirmation('Have you saved the mnemonic? (y/n): ');
-    if (!confirmed) {
-      logWarning('Please save the mnemonic and run `npm run oauth` again.');
-      process.exit(1);
+        const confirmed = await askConfirmation('Have you saved the mnemonic? (y/n): ');
+        if (!confirmed) {
+          logWarning('Please save the mnemonic and run `npm run oauth` again.');
+          process.exit(1);
+        }
+      }
+    } else {
+      logSuccess(`Using existing wallet: ${address}`);
     }
 
     // Step 2: Call challenge API
@@ -196,7 +242,8 @@ async function run() {
 
     log('');
     log('🎉 OAuth completed successfully!', 'green');
-    log('💡 You can now use the skill. Token is stored in ~/.mcp-hub/token.json', 'cyan');
+    log(`💡 Wallet: ${address}`, 'cyan');
+    log('💡 Token stored in ~/.mcp-hub/token.json', 'cyan');
     log('');
   } catch (error) {
     logError(`OAuth failed: ${error.message}`);
@@ -205,31 +252,45 @@ async function run() {
 }
 
 // Help
-if (process.argv.includes('--help') || process.argv.includes('-h')) {
+if (args.includes('--help') || args.includes('-h')) {
   console.log(`
 🔐 AIUSD Skill - EVM Wallet OAuth
 
-Authenticate with AIUSD using a newly generated EVM wallet (no browser required).
+Authenticate with AIUSD using an EVM wallet (no browser required).
+Supports non-interactive mode for headless/remote bot environments.
 
 Usage:
-  node scripts/oauth.js
+  node scripts/oauth.js [options]
   npm run oauth
 
-Flow:
-  1. Generates a new EVM wallet
-  2. Displays mnemonic - user MUST save it securely
-  3. Requests auth challenge from AIUSD
-  4. Signs challenge with the wallet
-  5. Exchanges signature for access token
-  6. Saves token to ~/.mcp-hub/token.json
-
-Important:
-  - Save the mnemonic! You need it to recover the wallet.
-  - This creates a NEW wallet each run. Use the same mnemonic to restore.
-  - Token is used for MCP calls; no browser OAuth needed.
+Wallet sources (priority order):
+  --private-key <hex>       Use an existing private key
+  AIUSD_PRIVATE_KEY=<hex>   Private key via environment variable
+  --mnemonic <phrase>       Restore wallet from mnemonic phrase
+  AIUSD_MNEMONIC=<phrase>   Mnemonic via environment variable
+  (none)                    Generate a new random wallet
 
 Options:
-  --help, -h    Show this help message
+  --non-interactive    Skip interactive prompts (for headless/bot environments)
+  --private-key <key>  EVM private key (hex, with or without 0x prefix)
+  --mnemonic <phrase>  12-word mnemonic to restore an existing wallet
+  --help, -h           Show this help message
+
+Examples:
+  # Interactive (new wallet, prompts to save mnemonic)
+  npm run oauth
+
+  # Non-interactive with new wallet (bot/headless)
+  node scripts/oauth.js --non-interactive
+
+  # Reuse existing wallet via mnemonic
+  node scripts/oauth.js --mnemonic "word1 word2 ... word12"
+
+  # Reuse existing wallet via private key
+  AIUSD_PRIVATE_KEY=0xabc123... node scripts/oauth.js --non-interactive
+
+  # Re-authenticate same wallet (env var set by bot)
+  AIUSD_MNEMONIC="word1 word2 ... word12" node scripts/oauth.js --non-interactive
 `);
   process.exit(0);
 }

@@ -9,8 +9,10 @@ license: MIT
 This skill calls the AIUSD backend via MCP. Auth is resolved in order: env `MCP_HUB_TOKEN`, mcporter OAuth, local `~/.mcp-hub/token.json`, or `~/.mcporter/credentials.json`. Ensure a valid Bearer token is available before calling. **Before invoking the CLI**, read **Common Pitfalls and Solutions** to avoid parameter, escaping, and intent mistakes.
 
 **Authentication options** (prefer oauth):
-- **`npm run oauth`** – **Preferred**: EVM wallet flow: generates a new wallet, outputs mnemonic for user to save, signs challenge, obtains token. No browser required.
-- **`npm run reauth`** – Alternative: Browser OAuth flow: clears cache, opens browser for mcporter OAuth.
+- **`node scripts/oauth.js --non-interactive`** – **Preferred**: EVM wallet challenge/verify flow. No browser required. Works in headless/remote bot environments.
+  - Reuse wallet: pass `--mnemonic <phrase>` or set `AIUSD_MNEMONIC` / `AIUSD_PRIVATE_KEY` env var.
+  - New wallet: omit wallet args; script generates one and outputs the mnemonic for the user to save.
+- **`npm run reauth`** – Alternative: Browser OAuth flow (only works when bot has a local browser).
 
 ## ⚠️ Agent Output Guidelines
 
@@ -35,22 +37,18 @@ Agents must NEVER use these words or phrases when responding to users:
 **ZERO TOLERANCE**: Any use of the word "template" in trading contexts is STRICTLY PROHIBITED.
 
 **Authentication Response Guidelines**:
-**CRITICAL**: When users request re-authentication, respond ONLY with:
-- "The browser window should have opened for you"
-- "If it didn't open automatically, please tell the agent to re-login again (or type 'reauth' again)"
-- "After completing authentication, you can check your account balance or wallet status in chat"
-
-**NEVER return the login URL to the user**: Do NOT ever show or tell the user `https://mcp.alpha.dev/oauth/login`. If the browser did not open, do NOT give them the URL—only tell them to ask the agent to re-login / type 'reauth' again.
+**CRITICAL**: When users request authentication or you detect an auth error (401, token expired, etc.):
+1. Run `node scripts/oauth.js --non-interactive` to authenticate automatically.
+2. If a mnemonic/private key is already stored (e.g. in `AIUSD_MNEMONIC` env var), include it so the same wallet is reused.
+3. After successful auth, inform the user briefly: "Authentication successful, your account is ready."
+4. If generating a new wallet, show the user their **wallet address** and **mnemonic** and ask them to save the mnemonic securely.
+5. Do NOT mention browser URLs, login pages, or mcporter.
 
 **STRICTLY FORBIDDEN**:
-- Do NOT include or mention the login URL (e.g. mcp.alpha.dev/oauth/login) in your response to the user
-- Do NOT include numbered steps like "1. Open page: [URL]", "2. Connect wallet", etc.
-- Do NOT mention any specific auth/login URLs in the response
-- Do NOT say "waiting for authentication completion" or similar waiting phrases
+- Do NOT include or mention any login URL (e.g. mcp.alpha.dev/oauth/login) in your response to the user
+- Do NOT say "browser has been opened for you" or "please complete the following steps in browser"
 - Do NOT provide detailed step-by-step browser instructions
-- Do NOT create bulleted lists of authentication steps
-- Do NOT say phrases like "browser has been opened for you", "please complete the following steps in browser"
-- Simply guide them to the browser and, if it didn't open, only say to re-login / type reauth again
+- Do NOT say "waiting for authentication completion" or similar waiting phrases
 
 Use natural, direct language to describe trading operations and system status. Simply describe what the trade will do without referencing templates or examples.
 
@@ -59,37 +57,46 @@ Use natural, direct language to describe trading operations and system status. S
 - **Login/Auth**: `https://mcp.alpha.dev/oauth/login` - Browser OAuth (used by `npm run reauth`)
 - **Official Website**: `https://aiusd.ai` - For trading operations, recharge, troubleshooting, and all user interactions
 
-## EVM Wallet OAuth (`npm run oauth`) – Preferred
+## EVM Wallet OAuth (`scripts/oauth.js`) – Preferred
 
-Primary authentication flow using a newly generated EVM wallet. No browser required.
+Primary authentication flow. No browser required. Supports headless/remote bot environments.
 
 ### Flow
 
-1. **Generate wallet**: Creates a new EVM wallet (ethers.js)
-2. **Display mnemonic**: Outputs 12-word mnemonic – user MUST save it securely
-3. **Challenge**: Calls `https://production.alpha.dev/api/user-service/v1/auth/challenge` with `{ domain: "aiusd.ai", chain_id: "eip155:1", address }`
-4. **Sign**: Signs the returned `message` with the wallet (EIP-191 personal_sign)
-5. **Verify**: Calls `https://production.alpha.dev/api/user-service/v1/auth/verify` with `{ challenge_id, signature }`
-6. **Save token**: Writes `access_token` to `~/.mcp-hub/token.json` for MCP use
+1. **Resolve wallet**: Use existing key (`--private-key` / `AIUSD_PRIVATE_KEY`) or mnemonic (`--mnemonic` / `AIUSD_MNEMONIC`), or generate a new one
+2. **Challenge**: Calls `https://production.alpha.dev/api/user-service/v1/auth/challenge` with `{ domain: "aiusd.ai", chain_id: "eip155:1", address }`
+3. **Sign**: Signs the returned `message` with the wallet (EIP-191 personal_sign)
+4. **Verify**: Calls `https://production.alpha.dev/api/user-service/v1/auth/verify` with `{ challenge_id, signature }`
+5. **Save token**: Writes `access_token` to `~/.mcp-hub/token.json` for MCP use
 
 ### Usage
 
 ```bash
+# Non-interactive (preferred for bot/headless) — new wallet
+node scripts/oauth.js --non-interactive
+
+# Non-interactive — reuse existing wallet
+AIUSD_MNEMONIC="word1 word2 ... word12" node scripts/oauth.js --non-interactive
+
+# Non-interactive — reuse via private key
+node scripts/oauth.js --non-interactive --private-key 0xabc123...
+
+# Interactive (local development)
 npm run oauth
-# or
-node scripts/oauth.js
 ```
 
 ### When to use
 
-- User prefers no browser / headless environment
-- User wants a dedicated wallet for the skill (separate from main wallet)
+- Remote bot environment (no browser available) — **use `--non-interactive`**
+- Headless server / CI environment
+- User wants a dedicated wallet for the skill
 - Browser OAuth fails (port conflicts, no GUI)
+- Re-authentication after token expiry — pass the same mnemonic to reuse the wallet
 
 ### Important
 
-- **Save the mnemonic**: Required to recover the wallet. Anyone with the mnemonic controls the AIUSD account.
-- **New wallet each run**: Each `npm run oauth` creates a new wallet. To reuse, restore from saved mnemonic (not implemented in script; use reauth or manual token for existing accounts).
+- **Save the mnemonic**: When a new wallet is generated, the mnemonic is printed. The agent MUST show it to the user and ask them to save it.
+- **Reuse wallets**: Pass `--mnemonic` or `AIUSD_MNEMONIC` env var to avoid creating a new wallet each time.
 - **Token storage**: Token saved to `~/.mcp-hub/token.json`; TokenManager reads it automatically.
 
 ## Common Pitfalls and Solutions
@@ -150,7 +157,7 @@ node dist/index.js call genalpha_get_transactions --params '{}'
 |--------|-------------------|
 | `Missing or invalid 'intent' parameter` | Check JSON structure and that `intent` is present and valid; compare with `tools --detailed`. |
 | `insufficient liquidity` | Token may have no/low liquidity on that chain; try another chain or token. |
-| `Jwt is missing` / 401 | Auth issue; run `npm run oauth` (preferred) or `npm run reauth`. |
+| `Jwt is missing` / 401 | Auth issue; run `node scripts/oauth.js --non-interactive`. |
 
 ## Installation Pitfalls and Solutions
 
@@ -193,7 +200,7 @@ node dist/index.js call genalpha_get_transactions --params '{}'
 ### 5. Auth setup (mcporter, OAuth, ports)
 
 - **Problems**: mcporter config, OAuth timeout, or port conflicts.
-- **Preferred – EVM wallet (no browser)**: `npm run oauth`. **Alternative – Browser OAuth**: Install → build → ensure mcporter → run reauth:
+- **Preferred – EVM wallet (no browser)**: `node scripts/oauth.js --non-interactive`. **Alternative – Browser OAuth**: Install → build → ensure mcporter → run reauth:
   ```bash
   cd aiusd-skill
   npm install && npm run build
@@ -214,7 +221,7 @@ node dist/index.js call genalpha_get_transactions --params '{}'
   ```bash
   rm -rf ~/.mcporter ~/.mcp-hub
   unset MCP_HUB_TOKEN
-  npm run oauth
+  node scripts/oauth.js --non-interactive
   ```
 
 ### 8. Module export name (when extending the skill)
@@ -229,7 +236,7 @@ node dist/index.js call genalpha_get_transactions --params '{}'
   1. Download/unzip (or install via supported method).
   2. `npm install` (postinstall runs if configured).
   3. `npm run build`; confirm `dist/` exists.
-  4. Run auth: `npm run oauth` (preferred) or `npm run reauth` (browser OAuth).
+  4. Run auth: `node scripts/oauth.js --non-interactive` (preferred) or `npm run reauth` (browser OAuth).
   5. `node dist/index.js balances` (or `aiusd-skill balances`).
   6. `node dist/index.js tools --detailed` to confirm tool list.
 
@@ -342,25 +349,27 @@ node -e "console.log(require('fs').existsSync(require('os').homedir() + '/.mcpor
 - **Purpose**: Obtain or refresh authentication token.
 - **When to use**: User has 401 Unauthorized, "Session ID is required", token expired, auth failure, user asks to re-login, or switch account.
 - **Params**: None. Pass `{}`.
-- **Options**:
-  - **`npm run oauth`** – **Preferred**: EVM wallet flow: generates new wallet, outputs mnemonic, signs challenge, saves token to `~/.mcp-hub/token.json`. No browser.
-  - **`npm run reauth`** / **`npm run login`** – Alternative: Browser OAuth via mcporter.
-- **reauth steps**:
-  1. Clear mcporter cache (`~/.mcporter/`)
-  2. Clear local token file (`~/.mcp-hub/`)
-  3. Clear other auth cache files
-  4. Start browser OAuth login
-  5. Verify new auth works
-- **Sample dialogue**:
+- **Preferred method**: `node scripts/oauth.js --non-interactive`
+  - For first-time auth (new wallet): `node scripts/oauth.js --non-interactive`
+  - For re-auth (reuse wallet): `AIUSD_MNEMONIC="<saved mnemonic>" node scripts/oauth.js --non-interactive`
+  - Alternative (local with browser): `npm run reauth`
+- **Sample dialogue (remote bot)**:
   ```
-  User: "I'm getting 401"
-  Claude: Looks like an auth issue; re-authenticating...
-  [Run: npm run reauth]
-  Claude: Re-auth done; you can use the skill again.
+  User: "Check balance"
+  [Tool returns 401]
+  Agent: Auth needed, setting up your account...
+  [Run: node scripts/oauth.js --non-interactive]
+  Agent: Your new wallet has been created.
+         Address: 0x1234...
+         Mnemonic: word1 word2 ... word12
+         Please save your mnemonic securely - you'll need it to recover this wallet.
+         Now fetching your balance...
+  [Call: genalpha_get_balances]
 
   User: "Re-login"
-  Claude: Clearing cache and re-logging in...
-  [Run: npm run login]
+  Agent: Re-authenticating with your existing wallet...
+  [Run: AIUSD_MNEMONIC="word1 word2..." node scripts/oauth.js --non-interactive]
+  Agent: Authentication refreshed. Your account is ready.
   ```
 
 ## Usage Flow (for Agent Reasoning)
@@ -377,18 +386,18 @@ node -e "console.log(require('fs').existsSync(require('os').homedir() + '/.mcpor
 
 ### Auth error auto-fix
 
-On auth-related errors, Claude should run re-auth:
+On auth-related errors, the agent should run oauth automatically:
 
-- **401 Unauthorized** → run `npm run oauth` (preferred) or `npm run reauth`
-- **Session ID is required** → run `npm run oauth` (preferred) or `npm run reauth`
-- **Token invalid or expired** → run `npm run oauth` (preferred) or `npm run reauth`
-- **Auth failed** → run `npm run oauth` (preferred) or `npm run reauth`
+- **401 Unauthorized** → run `node scripts/oauth.js --non-interactive` (with `AIUSD_MNEMONIC` if available)
+- **Session ID is required** → run `node scripts/oauth.js --non-interactive`
+- **Token invalid or expired** → run `node scripts/oauth.js --non-interactive`
+- **Auth failed** → run `node scripts/oauth.js --non-interactive`
 
-Prefer `npm run oauth`; use `npm run reauth` only when browser OAuth is required.
+Always use `--non-interactive`. Reuse the wallet mnemonic when available to avoid creating orphan accounts.
 
 ### Error handling flow
 
-1. **Detect auth error** → run `npm run oauth` (preferred) or `npm run reauth`
+1. **Detect auth error** → run `node scripts/oauth.js --non-interactive` (with `AIUSD_MNEMONIC` if wallet exists)
 2. **Business error** → relay server error to user; do not invent causes
 3. **Network/timeout** → retry once; then ask user to check network or try later
 4. **Trading issues/failures** → direct user to official website https://aiusd.ai for manual operations and support
@@ -399,9 +408,9 @@ Prefer `npm run oauth`; use `npm run reauth` only when browser OAuth is required
 ```
 User: "Check balance"
 [Tool returns 401]
-Claude: Auth expired; re-authenticating...
-[Run: npm run oauth or npm run reauth]
-Claude: Re-auth done. Fetching balance...
+Agent: Auth expired; re-authenticating...
+[Run: node scripts/oauth.js --non-interactive]
+Agent: Re-auth done. Fetching balance...
 [Call: genalpha_get_balances]
 ```
 
