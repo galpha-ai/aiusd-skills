@@ -9,6 +9,7 @@
 import { Command } from 'commander';
 import { TokenManager } from './token-manager.js';
 import { MCPClient } from './mcp-client.js';
+import { buildIntentXml } from './intent-builder.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 
 // Colors for console output
@@ -105,6 +106,21 @@ export class CLI {
         const params = JSON.stringify({ limit: parseInt(options.limit) });
         this.handleCallTool('genalpha_get_transactions', { ...options, params });
       });
+
+    // Trade command — structured parameters, deterministic XML construction
+    this.program
+      .command('trade')
+      .description('Execute a trade (builds intent XML automatically)')
+      .requiredOption('-a, --action <action>', 'buy or sell')
+      .requiredOption('-b, --base <token>', 'Token to buy/sell (symbol or address)')
+      .option('-q, --quote <token>', 'Token to pay with (default: USDC)', 'USDC')
+      .requiredOption('--amount <amount>', 'Amount (number or "all" for sell)')
+      .requiredOption('-c, --chain <chain>', 'Blockchain: solana, ethereum, base, arbitrum, bsc, polygon')
+      .option('--take-profit <percent>', 'Take-profit percentage')
+      .option('--stop-loss <percent>', 'Stop-loss percentage')
+      .option('--dry-run', 'Print the generated XML without executing')
+      .option('--pretty', 'Pretty-print the result')
+      .action((options) => this.handleTrade(options));
   }
 
   private async createClient(options: any): Promise<MCPClient> {
@@ -237,6 +253,56 @@ export class CLI {
       await client.disconnect();
     } catch (error) {
       logError(`Tool call failed: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  }
+
+  private async handleTrade(options: any): Promise<void> {
+    try {
+      // Build intent XML from structured params
+      const { xml, summary } = buildIntentXml({
+        action: options.action,
+        base: options.base,
+        quote: options.quote,
+        amount: options.amount,
+        chain: options.chain,
+        takeProfit: options.takeProfit ? parseFloat(options.takeProfit) : undefined,
+        stopLoss: options.stopLoss ? parseFloat(options.stopLoss) : undefined,
+      });
+
+      logInfo(`Trade: ${summary}`);
+
+      if (options.dryRun) {
+        console.log('');
+        console.log('📋 Generated Intent XML (dry run):');
+        console.log(xml);
+        return;
+      }
+
+      // Execute via MCP
+      const client = await this.createClient(options);
+      const result = await client.callTool('genalpha_execute_intent', { intent: xml });
+
+      console.log('');
+      console.log('📋 Trade Result:');
+      console.log('');
+
+      const formattedResult = MCPClient.formatToolResult(result);
+
+      if (options.pretty) {
+        try {
+          const jsonResult = JSON.parse(formattedResult);
+          console.log(JSON.stringify(jsonResult, null, 2));
+        } catch {
+          console.log(formattedResult);
+        }
+      } else {
+        console.log(formattedResult);
+      }
+
+      await client.disconnect();
+    } catch (error) {
+      logError(`Trade failed: ${error instanceof Error ? error.message : error}`);
       process.exit(1);
     }
   }
