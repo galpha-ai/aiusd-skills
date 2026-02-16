@@ -253,12 +253,29 @@ New tools may be added at any time. Always check `tools --detailed` to discover 
 
 ### Trading Rules (genalpha_execute_intent)
 
+The `intent` parameter MUST be a complete XML string wrapped in `<intent>`:
+
+**Buy example** (user says "Buy $100 of SOL with USDC"):
+```xml
+<intent><type>IMMEDIATE</type><chain_id>solana:mainnet-beta</chain_id><buy><base>SOL</base><quote>USDC</quote><amount>100</amount></buy></intent>
+```
+
+**Sell example** (user says "Sell 2 SOL"):
+```xml
+<intent><type>IMMEDIATE</type><chain_id>solana:mainnet-beta</chain_id><sell><base>SOL</base><quote>USDC</quote><amount>2</amount></sell></intent>
+```
+
+**Rules:**
+- `<intent>` is the **REQUIRED root element** — never omit it
 - `<buy>`: `amount` = quote token to spend (e.g., buy SOL: amount is the USDC you spend)
 - `<sell>`: `amount` = base token to sell
+- `<type>` is always `IMMEDIATE`
+- `<chain_id>`: use `solana:mainnet-beta` for Solana, `eip155:1` for Ethereum, `eip155:8453` for Base, etc.
 - **AIUSD constraint**: AIUSD can only convert to stablecoins (USDC/USDT/USD1). To buy SOL with AIUSD: first AIUSD→USDC, then USDC→SOL (two trades)
 - Selling AIUSD: use `<buy>` with `<quote>AIUSD</quote>` and `<base>USDC_ADDRESS</base>`
 - Always confirm the trade with the user before executing
 - After execution: show token received, amount spent, transaction ID
+- Always run `node dist/index.js tools --detailed` to get the latest schema — parameters may change
 
 ---
 
