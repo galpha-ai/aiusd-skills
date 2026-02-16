@@ -15,6 +15,7 @@ import { spawn, execSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { homedir } from 'os';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -137,46 +138,53 @@ class SkillSetup {
   async setupAuthentication() {
     logStep(3, 'Setting up authentication');
 
-    // Check for existing authentication
+    // Check for existing valid token
     if (process.env.MCP_HUB_TOKEN || process.env.AIUSD_TOKEN) {
       logSuccess('Environment token found');
       return;
     }
 
-    // Check for mcporter
-    try {
-      execSync('which mcporter', { stdio: 'pipe' });
-      log('🔐 Checking mcporter authentication...', 'blue');
-
+    // Check for existing token file
+    const tokenFile = join(homedir(), '.mcp-hub', 'token.json');
+    if (existsSync(tokenFile)) {
       try {
-        const result = execSync(
-          'npx mcporter list --http-url https://mcp.alpha.dev/api/mcp-hub/mcp --name aiusd',
-          { cwd: this.projectRoot, encoding: 'utf8', timeout: 10000 }
-        );
-
-        if (result.includes('tools')) {
-          logSuccess('mcporter authentication verified');
-          return;
+        const tokenData = JSON.parse(readFileSync(tokenFile, 'utf8'));
+        if (tokenData.token) {
+          const age = Date.now() / 1000 - (tokenData.timestamp || 0);
+          if (age < (tokenData.expires_in || 86400)) {
+            logSuccess('Valid token found in ~/.mcp-hub/token.json');
+            return;
+          }
+          logWarning('Token expired, will re-authenticate');
         }
-      } catch (error) {
-        logWarning('mcporter authentication needed');
+      } catch {
+        // Invalid token file, proceed to auth
       }
-    } catch {
-      logWarning('mcporter not available');
     }
 
-    // Show setup instructions
-    log('\n📋 Authentication Setup Required:', 'yellow');
-    log('Choose one of these methods:', 'cyan');
-    log('');
-    log('1. Environment Variable:', 'blue');
-    log('   export MCP_HUB_TOKEN="Bearer your_token_here"', 'cyan');
-    log('');
-    log('2. Use mcporter (Recommended):', 'blue');
-    log('   npx mcporter list --http-url https://mcp.alpha.dev/api/mcp-hub/mcp --name aiusd', 'cyan');
-    log('');
-    log('3. Get token from: https://mcp.alpha.dev/oauth/login', 'blue');
-    log('');
+    // Run EVM wallet OAuth (non-interactive)
+    log('🔐 Running EVM wallet OAuth...', 'blue');
+    try {
+      execSync('node scripts/oauth.js --non-interactive', {
+        cwd: this.projectRoot,
+        stdio: 'inherit',
+        timeout: 30000
+      });
+      logSuccess('Authentication completed');
+    } catch (error) {
+      logWarning('Auto-authentication failed');
+      log('\n📋 Manual Authentication Options:', 'yellow');
+      log('', 'reset');
+      log('1. Run OAuth manually:', 'blue');
+      log('   node scripts/oauth.js --non-interactive', 'cyan');
+      log('', 'reset');
+      log('2. Reuse existing wallet:', 'blue');
+      log('   AIUSD_MNEMONIC="word1 word2 ... word12" node scripts/oauth.js --non-interactive', 'cyan');
+      log('', 'reset');
+      log('3. Environment variable:', 'blue');
+      log('   export MCP_HUB_TOKEN="Bearer your_token_here"', 'cyan');
+      log('', 'reset');
+    }
   }
 
   async testConnection() {
