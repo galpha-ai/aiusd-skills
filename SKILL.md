@@ -253,29 +253,84 @@ New tools may be added at any time. Always check `tools --detailed` to discover 
 
 ### Trading Rules (genalpha_execute_intent)
 
-The `intent` parameter MUST be a complete XML string wrapped in `<intent>`:
+The `intent` parameter MUST be a complete XML string with this exact structure:
 
-**Buy example** (user says "Buy $100 of SOL with USDC"):
 ```xml
-<intent><type>IMMEDIATE</type><chain_id>solana:mainnet-beta</chain_id><buy><base>SOL</base><quote>USDC</quote><amount>100</amount></buy></intent>
+<intent>
+  <type>IMMEDIATE</type>
+  <chain_id>CAIP2_CHAIN_ID</chain_id>
+  <entry>
+    <condition>
+      <immediate>true</immediate>
+    </condition>
+    <action>
+      <buy> or <sell>
+    </action>
+  </entry>
+</intent>
 ```
 
-**Sell example** (user says "Sell 2 SOL"):
+**Buy example** — "Buy $100 of SOL with USDC on Solana":
 ```xml
-<intent><type>IMMEDIATE</type><chain_id>solana:mainnet-beta</chain_id><sell><base>SOL</base><quote>USDC</quote><amount>2</amount></sell></intent>
+<intent><type>IMMEDIATE</type><chain_id>solana:mainnet-beta</chain_id><entry><condition><immediate>true</immediate></condition><action><buy><amount>100</amount><quote>EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v</quote><base>So11111111111111111111111111111111111111112</base></buy></action></entry></intent>
 ```
 
-**Rules:**
-- `<intent>` is the **REQUIRED root element** — never omit it
-- `<buy>`: `amount` = quote token to spend (e.g., buy SOL: amount is the USDC you spend)
-- `<sell>`: `amount` = base token to sell
-- `<type>` is always `IMMEDIATE`
-- `<chain_id>`: use `solana:mainnet-beta` for Solana, `eip155:1` for Ethereum, `eip155:8453` for Base, etc.
-- **AIUSD constraint**: AIUSD can only convert to stablecoins (USDC/USDT/USD1). To buy SOL with AIUSD: first AIUSD→USDC, then USDC→SOL (two trades)
-- Selling AIUSD: use `<buy>` with `<quote>AIUSD</quote>` and `<base>USDC_ADDRESS</base>`
+**Sell example** — "Sell 2 SOL":
+```xml
+<intent><type>IMMEDIATE</type><chain_id>solana:mainnet-beta</chain_id><entry><condition><immediate>true</immediate></condition><action><sell><amount>2</amount><quote>EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v</quote><base>So11111111111111111111111111111111111111112</base></sell></action></entry></intent>
+```
+
+**Sell all** — "Sell all my SOL":
+```xml
+<intent><type>IMMEDIATE</type><chain_id>solana:mainnet-beta</chain_id><entry><condition><immediate>true</immediate></condition><action><sell><amount>all</amount><quote>EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v</quote><base>So11111111111111111111111111111111111111112</base></sell></action></entry></intent>
+```
+
+**Buy with exit strategy** — "Buy $50 of TRUMP, take profit at +20%, stop loss at -10%":
+```xml
+<intent><type>IMMEDIATE</type><chain_id>solana:mainnet-beta</chain_id><entry><condition><immediate>true</immediate></condition><action><buy><amount>50</amount><quote>EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v</quote><base>trump</base></buy></action></entry><exit><conditions><profit_percent>20</profit_percent><loss_percent>10</loss_percent></conditions><logic>OR</logic></exit></intent>
+```
+
+**Required XML structure:**
+- `<intent>` — root element (NEVER omit)
+- `<type>` — always `IMMEDIATE` for swap trades
+- `<chain_id>` — CAIP-2 format (see chain list below)
+- `<entry><condition><immediate>true</immediate></condition>` — required for immediate trades
+- `<action>` — contains `<buy>` or `<sell>`
+
+**Buy vs Sell semantics:**
+- `<buy>`: `<amount>` = quote token to SPEND. `<quote>` = what you pay with. `<base>` = what you receive.
+- `<sell>`: `<amount>` = base token to SELL (or `"all"` or `<relative><percentage>50.0</percentage></relative>`). `<quote>` = what you receive. `<base>` = what you sell.
+
+**Chain IDs:**
+
+| Chain | chain_id |
+|-------|----------|
+| Solana | `solana:mainnet-beta` |
+| Ethereum | `eip155:1` |
+| Base | `eip155:8453` |
+| Arbitrum | `eip155:42161` |
+| BSC | `eip155:56` |
+| Polygon | `eip155:137` |
+
+**Common token addresses:**
+
+| Token | Solana | Ethereum |
+|-------|--------|----------|
+| SOL | `So11111111111111111111111111111111111111112` | — |
+| USDC | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | `0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48` |
+| USDT | `Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB` | `0xdAC17F958D2ee523a2206206994597C13D831ec7` |
+| ETH | — | `0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee` |
+
+For other tokens (TRUMP, NVDAx, etc.), use the symbol directly — TIM resolves it. If the user provides a contract address, use it directly.
+
+**AIUSD constraint**: AIUSD can only convert to stablecoins (USDC/USDT/USD1). To buy SOL with AIUSD: first AIUSD→USDC, then USDC→SOL (two trades).
+
+**Other rules:**
 - Always confirm the trade with the user before executing
 - After execution: show token received, amount spent, transaction ID
-- Always run `node dist/index.js tools --detailed` to get the latest schema — parameters may change
+- Amounts are human-readable decimals (e.g., `100`, `0.5`), NOT raw units (no wei/lamports)
+- Default quote token is USDC if user doesn't specify
+- Run `node dist/index.js tools --detailed` to get the latest schema — parameters may change
 
 ---
 
