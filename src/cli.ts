@@ -121,6 +121,13 @@ export class CLI {
       .option('--dry-run', 'Print the generated XML without executing')
       .option('--pretty', 'Pretty-print the result')
       .action((options) => this.handleTrade(options));
+
+    // Get deposit address command
+    this.program
+      .command('get-deposit-address')
+      .description('Get your AIUSD deposit addresses for all supported chains')
+      .option('--pretty', 'Pretty-print the result')
+      .action((options) => this.handleGetDepositAddress(options));
   }
 
   private async createClient(options: any): Promise<MCPClient> {
@@ -303,6 +310,150 @@ export class CLI {
       await client.disconnect();
     } catch (error) {
       logError(`Trade failed: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  }
+
+  private async handleGetDepositAddress(options: any): Promise<void> {
+    try {
+      // Get authentication token
+      const globalOptions = this.program.opts();
+      const token = await TokenManager.getToken(globalOptions.token || options.token);
+
+      if (!token) {
+        TokenManager.printTokenInstructions();
+        process.exit(1);
+      }
+
+      logInfo('Fetching deposit addresses...');
+
+      // Call the deposit addresses API directly
+      const response = await fetch('https://production.alpha.dev/api/user-service/users/deposit-addresses/refresh', {
+        method: 'POST',
+        headers: {
+          'Authorization': token,
+          'Content-Type': 'application/json',
+        },
+        body: '{}',
+      });
+
+      if (!response.ok) {
+        throw new Error(`API returned error status ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      console.log('');
+      console.log('💎 Your AIUSD Deposit Addresses:');
+      console.log('');
+      console.log('📌 Important Deposit Rules:');
+      console.log('   • Tron: ONLY USDT (not USDC!)');
+      console.log('   • Other chains: ONLY USDC (not USDT!)');
+      console.log('   • Minimum deposit: $10');
+      console.log('   • Tokens will be automatically converted to AIUSD');
+      console.log('');
+
+      // Chain name mapping
+      const chainNames: { [key: string]: string } = {
+        'eip155:1': 'Ethereum',
+        'eip155:56': 'BSC',
+        'eip155:8453': 'Base',
+        'eip155:42161': 'Arbitrum',
+        'eip155:137': 'Polygon',
+        'solana:mainnet-beta': 'Solana',
+        'tron:mainnet': 'Tron',
+      };
+
+      // Group addresses by actual address (to detect if they're the same)
+      const addressMap = new Map<string, string[]>();
+
+      // Handle new API response structure
+      const addresses = data.addresses || data.accounts || [];
+
+      addresses.forEach((item: any) => {
+        // Support both old and new response formats
+        const address = item.address || item.account_address;
+        const chainId = item.chain_id;
+        const chainName = chainNames[chainId] || chainId;
+
+        if (!addressMap.has(address)) {
+          addressMap.set(address, []);
+        }
+        addressMap.get(address)!.push(chainName);
+      });
+
+      // Display addresses
+      if (addressMap.size === 1) {
+        // All chains use the same address
+        const [address, chains] = Array.from(addressMap.entries())[0];
+        console.log('🔷 Universal Deposit Address (All Chains):');
+        console.log(`   ${address}`);
+        console.log('');
+        console.log('   Supported chains:');
+        chains.forEach(chain => {
+          console.log(`   • ${chain}`);
+        });
+      } else {
+        // Different addresses for different chains
+        console.log('🔷 Chain-Specific Deposit Addresses:');
+        console.log('');
+
+        // Show Solana first if it exists (USDC only)
+        const solanaItem = addresses.find((item: any) => item.chain_id === 'solana:mainnet-beta');
+        if (solanaItem) {
+          console.log('🌐 Solana (USDC):');
+          console.log(`   ${solanaItem.address || solanaItem.account_address}`);
+          console.log('');
+        }
+
+        // Show Tron if it exists (USDT only!)
+        const tronItem = addresses.find((item: any) => item.chain_id === 'tron:mainnet');
+        if (tronItem) {
+          console.log('🔶 Tron (USDT ONLY):');
+          console.log(`   ${tronItem.address || tronItem.account_address}`);
+          console.log('   ⚠️  Only USDT accepted on Tron!');
+          console.log('');
+        }
+
+        // Group EVM chains if they share addresses
+        const evmItems = addresses.filter((item: any) => item.chain_id.startsWith('eip155:'));
+        const evmAddressMap = new Map<string, string[]>();
+
+        evmItems.forEach((item: any) => {
+          const address = item.address || item.account_address;
+          const chainName = chainNames[item.chain_id] || item.chain_id;
+
+          if (!evmAddressMap.has(address)) {
+            evmAddressMap.set(address, []);
+          }
+          evmAddressMap.get(address)!.push(chainName);
+        });
+
+        evmAddressMap.forEach((chains, address) => {
+          if (chains.length > 1) {
+            console.log(`⚡ EVM Chains - USDC (${chains.join(', ')}):`);
+          } else {
+            console.log(`⚡ ${chains[0]} (USDC):`);
+          }
+          console.log(`   ${address}`);
+          console.log('');
+        });
+      }
+
+      console.log('');
+      console.log('💡 After depositing, use the "balances" command to check your AIUSD balance.');
+      console.log('');
+      console.log('⚠️  CRITICAL: Wrong token = Lost funds!');
+      console.log('   • Tron → USDT only');
+      console.log('   • All others → USDC only');
+
+      if (options.pretty && data) {
+        console.log('');
+        console.log('📋 Full Response:');
+        console.log(JSON.stringify(data, null, 2));
+      }
+    } catch (error) {
+      logError(`Failed to get deposit addresses: ${error instanceof Error ? error.message : error}`);
       process.exit(1);
     }
   }
