@@ -1,6 +1,6 @@
 {
   "name": "aiusd-skill",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "AIUSD trading and account management skill via MCP protocol. ",
   "main": "dist/index.js",
   "type": "module",
@@ -17,7 +17,9 @@
     "publish-cli": "cd packages/aiusd-skills && npm publish",
     "setup": "node scripts/skill-init.js",
     "reauth": "node scripts/reauth.js",
-    "login": "node scripts/reauth.js",
+    "login": "node scripts/smart-login.js",
+    "smart-login": "node scripts/smart-login.js",
+    "oauth": "node scripts/oauth.js",
     "test-reauth": "node scripts/test-reauth.js",
     "show-auth": "node scripts/show-auth-locations.js",
     "postinstall": "patch-package && node scripts/skill-init.js"
@@ -38,6 +40,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.10.0",
     "commander": "^12.0.0",
+    "ethers": "^6.13.0",
     "mcporter": "^0.7.3",
     "zod": "^3.25.0"
   },
