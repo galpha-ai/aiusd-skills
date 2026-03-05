@@ -1,19 +1,23 @@
 /**
- * Token Manager - Handles authentication token retrieval
+ * Token Manager (library version)
  *
- * Priority order:
- * 1. Environment variables (MCP_HUB_TOKEN, AIUSD_TOKEN)
- * 2. Local token file (~/.mcp-hub/token.json)
+ * Priority: env var -> ~/.aiusd/token.json
+ * Supports refresh but not interactive auth.
  */
 
-import { readFile, access } from 'fs/promises';
+import { readFile, writeFile, access, mkdir } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
 
-export interface TokenData {
-  token: string;
-  timestamp?: number;
-  expires_in?: number;
+const AIUSD_DIR = join(homedir(), '.aiusd');
+const TOKEN_FILE = join(AIUSD_DIR, 'token.json');
+const REFRESH_URL = 'https://production.alpha.dev/api/user-service/auth/refresh';
+
+export interface StoredTokens {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  timestamp: number;
 }
 
 export class TokenManager {
@@ -21,79 +25,85 @@ export class TokenManager {
     return process.env.MCP_HUB_TOKEN || process.env.AIUSD_TOKEN || null;
   }
 
-  private static async getTokenFromFile(): Promise<string | null> {
-    const filePath = join(homedir(), '.mcp-hub', 'token.json');
+  private static async readStoredTokens(): Promise<StoredTokens | null> {
     try {
-      await access(filePath);
-      const content = await readFile(filePath, 'utf8');
-      const data: TokenData = JSON.parse(content);
-
-      if (data.timestamp && data.expires_in) {
-        const age = Date.now() / 1000 - data.timestamp;
-        if (age > data.expires_in) {
-          return null;
-        }
+      await access(TOKEN_FILE);
+      const content = await readFile(TOKEN_FILE, 'utf8');
+      const data = JSON.parse(content) as StoredTokens;
+      if (data.access_token && data.refresh_token && data.expires_in && data.timestamp) {
+        return data;
       }
-
-      return data.token || null;
+      return null;
     } catch {
-      // File doesn't exist or invalid format
+      return null;
     }
-    return null;
   }
 
-  static async getToken(): Promise<string | null> {
-    // 1. Environment variables
-    const envToken = this.getTokenFromEnv();
-    if (envToken) {
-      return this.normalizeToken(envToken);
-    }
+  private static isExpired(tokens: StoredTokens): boolean {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    return nowSeconds >= tokens.timestamp + tokens.expires_in;
+  }
 
-    // 2. Local token file
-    const fileToken = await this.getTokenFromFile();
-    if (fileToken) {
-      return this.normalizeToken(fileToken);
-    }
+  private static async saveTokens(tokens: StoredTokens): Promise<void> {
+    await mkdir(AIUSD_DIR, { recursive: true });
+    await writeFile(TOKEN_FILE, JSON.stringify(tokens, null, 2), { encoding: 'utf8', mode: 0o600 });
+  }
 
-    return null;
+  private static async refreshAccessToken(refreshToken: string): Promise<StoredTokens | null> {
+    try {
+      const res = await fetch(REFRESH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json() as {
+        access_token: string;
+        refresh_token: string;
+        expires_in: number;
+      };
+
+      const tokens: StoredTokens = {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_in: data.expires_in,
+        timestamp: Math.floor(Date.now() / 1000),
+      };
+      await this.saveTokens(tokens);
+      return tokens;
+    } catch {
+      return null;
+    }
   }
 
   private static normalizeToken(token: string): string {
-    if (!token.startsWith('Bearer ')) {
-      return `Bearer ${token}`;
+    return token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+  }
+
+  static async getToken(): Promise<string | null> {
+    const envToken = this.getTokenFromEnv();
+    if (envToken) return this.normalizeToken(envToken);
+
+    const stored = await this.readStoredTokens();
+    if (stored && !this.isExpired(stored)) {
+      return this.normalizeToken(stored.access_token);
     }
-    return token;
+
+    // Try refresh
+    if (stored?.refresh_token) {
+      const refreshed = await this.refreshAccessToken(stored.refresh_token);
+      if (refreshed) return this.normalizeToken(refreshed.access_token);
+    }
+
+    return null;
   }
 
   static getSetupInstructions(): string {
-    return `Authentication required. Please set up using one of these methods:
-
-1. Run OAuth login (recommended):
-   npm run oauth
-
-2. Environment variable:
-   export MCP_HUB_TOKEN="Bearer your_token_here"
-
-3. Manual token file:
-   mkdir -p ~/.mcp-hub
-   echo '{"token": "Bearer your_token_here", "timestamp": ${Math.floor(Date.now() / 1000)}, "expires_in": 86400}' > ~/.mcp-hub/token.json`;
+    return 'Authentication required. Run: npm run login';
   }
 
   static validateToken(token: string): boolean {
-    if (!token || typeof token !== 'string') {
-      return false;
-    }
-
-    if (!token.startsWith('Bearer ')) {
-      return false;
-    }
-
-    const jwtPart = token.substring(7);
-    const parts = jwtPart.split('.');
-    if (parts.length !== 3) {
-      return false;
-    }
-
-    return true;
+    if (!token?.startsWith('Bearer ')) return false;
+    return token.substring(7).split('.').length === 3;
   }
 }
