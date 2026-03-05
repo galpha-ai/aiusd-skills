@@ -190,13 +190,13 @@ main() {
     log_success "AIUSD Skill installed successfully!"
     echo ""
     echo -e "\${YELLOW}🚀 Next Steps:\${NC}"
-    echo -e "\${BLUE}1. cd aiusd-skill\${NC}"
-    echo -e "\${BLUE}2. npm run setup\${NC}"
+    echo -e "\${BLUE}1. cd aiusd-skill && npm install -g .\${NC}"
+    echo -e "\${BLUE}2. aiusd login\${NC}"
     echo ""
     echo -e "\${CYAN}💡 Usage Examples:\${NC}"
-    echo -e "\${BLUE}• Check balance: npm start -- balances\${NC}"
-    echo -e "\${BLUE}• List tools: npm start -- tools\${NC}"
-    echo -e "\${BLUE}• Get help: npm start -- --help\${NC}"
+    echo -e "\${BLUE}• Check balance: aiusd balances\${NC}"
+    echo -e "\${BLUE}• Trade: aiusd guide spot\${NC}"
+    echo -e "\${BLUE}• Get help: aiusd --help\${NC}"
     echo ""
 
     exit 0

@@ -48,15 +48,16 @@ function install() {
     }
     fs.renameSync(packageDir, targetPath);
 
-    log('Installing dependencies in skill directory...', 'info');
+    log('Installing dependencies...', 'info');
     execSync('npm install', { cwd: targetPath, stdio: 'inherit' });
 
     log('AIUSD skill installed successfully.', 'success');
     log('', 'info');
     log('Next steps:', 'info');
     log(`  cd ${TARGET_DIR}`, 'info');
-    log('  npm run reauth   # complete authentication', 'info');
-    log('  npm start -- balances   # or: npm start -- tools', 'info');
+    log('  npm install -g .          # make "aiusd" command available', 'info');
+    log('  aiusd login               # authenticate', 'info');
+    log('  aiusd balances            # check balance', 'info');
   } finally {
     try {
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -66,14 +67,16 @@ function install() {
 
 function help() {
   console.log(`
-aiusd-skills - Install AIUSD skill for OpenClaude / MCP
+aiusd-skills - Install AIUSD skill
 
 Usage:
   npx aiusd-skills install    Install skill into ./aiusd-skill
 
 After install:
-  cd aiusd-skill && npm run reauth
-  npm start -- balances
+  cd aiusd-skill
+  npm install -g .            # make "aiusd" command available
+  aiusd login                 # authenticate
+  aiusd balances              # check balance
 `);
 }
 

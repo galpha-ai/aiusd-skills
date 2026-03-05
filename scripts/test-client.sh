@@ -76,8 +76,8 @@ else
     log_warning "Balance check failed (authentication required)"
     echo ""
     echo "🔐 To enable full testing, set up authentication:"
-    echo "   export MCP_HUB_TOKEN=\"Bearer your_token\""
-    echo "   OR use: npm run setup"
+    echo "   aiusd login"
+    echo "   OR: node dist/index.js login"
 fi
 
 echo ""
@@ -85,7 +85,7 @@ log_success "Basic functionality tests completed!"
 
 echo ""
 echo "🚀 Manual testing commands:"
-echo "  npm test                    # This test script"
-echo "  node dist/index.js test     # Connection test"
-echo "  node dist/index.js tools    # List available tools"
-echo "  node dist/index.js balances # Check balances"
+echo "  aiusd login                 # Authenticate"
+echo "  aiusd balances              # Check balances"
+echo "  aiusd guide spot            # Spot trading guide"
+echo "  aiusd --help                # All commands"

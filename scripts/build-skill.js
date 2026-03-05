@@ -66,7 +66,7 @@ async function buildSkill() {
       'package.json',
       'README.md',
       'SKILL.md',
-      'AUTHENTICATION.md',
+      'skills/',
       'scripts/',
       'dist/',
       'src/',
@@ -158,9 +158,9 @@ async function buildSkill() {
     log('', 'reset');
     log('📋 Usage:', 'yellow');
     log('• Extract: tar -xzf build/aiusd-skill-agent.skill', 'blue');
-    log('• Install: cd extracted-dir && npm install', 'blue');
-    log('• Use: npm run setup (for authentication and testing)', 'blue');
-    log('• Distribute: Lightweight package without node_modules', 'cyan');
+    log('• Install: cd extracted-dir && npm install -g .', 'blue');
+    log('• Login: aiusd login', 'blue');
+    log('• Use: aiusd balances', 'cyan');
 
   } catch (error) {
     log(`❌ Build failed: ${error.message}`, 'red');
