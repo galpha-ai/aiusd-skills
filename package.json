@@ -16,12 +16,11 @@
     "build-installers": "node scripts/build-js-installer.js && node scripts/build-sh-installer.js",
     "publish-cli": "cd packages/aiusd-skills && npm publish",
     "setup": "node scripts/skill-init.js",
-    "login": "node scripts/oauth.js",
-    "oauth": "node scripts/oauth.js",
+    "login": "node dist/index.js login",
     "postinstall": "node scripts/skill-init.js"
   },
   "bin": {
-    "aiusd-skill": "./dist/index.js"
+    "aiusd": "./dist/index.js"
   },
   "files": [
     "dist/**/*",
