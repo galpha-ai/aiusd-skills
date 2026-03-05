@@ -139,6 +139,12 @@ export class CLI {
       .description('Get the latest usage guide for a domain')
       .argument('[domain]', 'Domain name (spot, perp, hl-spot, prediction, monitor, market, account)')
       .action((domain) => this.handleGuide(domain));
+
+    // --- Logout subcommand ---
+    this.program
+      .command('logout')
+      .description('Remove stored tokens and sign out')
+      .action(() => this.handleLogout());
   }
 
   // -------------------------------------------------------------------------
@@ -625,6 +631,23 @@ export class CLI {
     } catch (error) {
       logError(`Monitor add failed: ${error instanceof Error ? error.message : error}`);
       process.exit(1);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Logout handler
+  // -------------------------------------------------------------------------
+
+  private async handleLogout(): Promise<void> {
+    const { unlink } = await import('fs/promises');
+    const { join } = await import('path');
+    const { homedir } = await import('os');
+    const tokenFile = join(homedir(), '.aiusd', 'token.json');
+    try {
+      await unlink(tokenFile);
+      console.log('Logged out. Token removed.');
+    } catch {
+      console.log('No active session found.');
     }
   }
 
