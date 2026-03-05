@@ -336,14 +336,14 @@ export class CLI {
     const globalOptions = this.program.opts();
 
     return new TradeClient(baseUrl, async () => {
-      const token = await TokenManager.getToken(globalOptions.token);
+      const token = await TokenManager.ensureToken(globalOptions.token);
       if (!token) {
-        TokenManager.printTokenInstructions();
-        process.exit(1);
-      }
-      if (!TokenManager.validateToken(token)) {
-        logError('Invalid token format');
-        process.exit(1);
+        const authToken = await this.runFirstTimeAuth();
+        if (!authToken) {
+          console.log('Authentication required. Exiting.');
+          process.exit(1);
+        }
+        return authToken;
       }
       return token;
     });
@@ -366,31 +366,144 @@ export class CLI {
   }
 
   private async createClient(options: any): Promise<MCPClient> {
-    // Get authentication token
     const globalOptions = this.program.opts();
-    const token = await TokenManager.getToken(globalOptions.token || options.token);
+    let token = await TokenManager.ensureToken(globalOptions.token || options.token);
 
     if (!token) {
-      TokenManager.printTokenInstructions();
-      process.exit(1);
+      token = await this.runFirstTimeAuth();
+      if (!token) {
+        console.log('Authentication required. Exiting.');
+        process.exit(1);
+      }
     }
 
-    if (!TokenManager.validateToken(token)) {
-      logError('Invalid token format');
-      process.exit(1);
-    }
-
-    // Create and connect MCP client
     const serverUrl = globalOptions.server || options.server || this.defaultServerUrl;
     const timeout = parseInt(globalOptions.timeout || options.timeout || '30000');
-
-    logSuccess('Authentication token found');
 
     return await MCPClient.create({
       serverUrl,
       authToken: token,
       timeout,
     });
+  }
+
+  private async runFirstTimeAuth(): Promise<string | null> {
+    console.log('\nNo authentication found. Choose a method:\n');
+    console.log('  (a) Create new wallet');
+    console.log('  (b) Use existing wallet (browser signing)');
+    console.log('  (c) Restore from mnemonic backup file');
+    console.log('');
+
+    const choice = await this.prompt('Enter choice [a/b/c]: ');
+
+    switch (choice.toLowerCase()) {
+      case 'a':
+        return this.authNewWallet();
+      case 'b':
+        return this.authExistingWallet();
+      case 'c':
+        return this.authMnemonicRestore();
+      default:
+        console.log('Invalid choice.');
+        return null;
+    }
+  }
+
+  private async prompt(question: string): Promise<string> {
+    const { createInterface } = await import('readline');
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    return new Promise(resolve => {
+      rl.question(question, answer => {
+        rl.close();
+        resolve(answer.trim());
+      });
+    });
+  }
+
+  private async authNewWallet(): Promise<string | null> {
+    const { Wallet } = await import('ethers');
+    const wallet = Wallet.createRandom();
+    const mnemonic = wallet.mnemonic?.phrase;
+
+    if (!mnemonic) {
+      logError('Failed to generate wallet.');
+      return null;
+    }
+
+    await TokenManager.saveMnemonic(mnemonic);
+
+    // Output structured info for host agent (openClaw etc.)
+    const authEvent = {
+      auth_event: 'wallet_created',
+      mnemonic_file: TokenManager.MNEMONIC_FILE_PATH,
+      mnemonic,
+      warning: 'Loss of mnemonic means permanent loss of account access. Please back up securely.',
+      address: wallet.address,
+    };
+    console.log('\n' + JSON.stringify(authEvent, null, 2) + '\n');
+
+    logInfo('Authenticating with new wallet...');
+    const tokens = await TokenManager.challengeVerify(wallet);
+    if (!tokens) {
+      logError('Authentication failed.');
+      return null;
+    }
+
+    logSuccess('Authentication successful.');
+    return TokenManager.normalizeToken(tokens.access_token);
+  }
+
+  private async authExistingWallet(): Promise<string | null> {
+    const session = await TokenManager.createAgentSession();
+    if (!session) {
+      logError('Failed to create auth session.');
+      return null;
+    }
+
+    const url = `${TokenManager.AGENT_AUTH_URL}?sid=${session.session_id}`;
+    console.log('\nPlease open this URL in your browser to authenticate:\n');
+    console.log(`  ${url}\n`);
+    logInfo('Waiting for authentication...');
+
+    const tokens = await TokenManager.pollAgentSession(session.session_id, session.expires_at);
+    if (!tokens) {
+      logError('Login expired. Please re-run the command.');
+      return null;
+    }
+
+    logSuccess('Authentication successful.');
+    return TokenManager.normalizeToken(tokens.access_token);
+  }
+
+  private async authMnemonicRestore(): Promise<string | null> {
+    const filePath = await this.prompt('Enter path to mnemonic backup file: ');
+    if (!filePath) {
+      logError('No path provided.');
+      return null;
+    }
+
+    try {
+      const { readFile } = await import('fs/promises');
+      const mnemonic = (await readFile(filePath, 'utf8')).trim();
+
+      const { Wallet } = await import('ethers');
+      const wallet = Wallet.fromPhrase(mnemonic);
+
+      await TokenManager.saveMnemonic(mnemonic);
+      logSuccess(`Wallet restored: ${wallet.address}`);
+
+      const tokens = await TokenManager.challengeVerify(wallet);
+      if (!tokens) {
+        logError('Authentication failed.');
+        return null;
+      }
+
+      logSuccess('Authentication successful.');
+      return TokenManager.normalizeToken(tokens.access_token);
+    } catch (error) {
+      logError(`Failed to restore from mnemonic: ${error instanceof Error ? error.message : error}`);
+      return null;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -662,11 +775,13 @@ export class CLI {
     try {
       // Get authentication token
       const globalOptions = this.program.opts();
-      const token = await TokenManager.getToken(globalOptions.token || options.token);
-
+      let token = await TokenManager.ensureToken(globalOptions.token || options.token);
       if (!token) {
-        TokenManager.printTokenInstructions();
-        process.exit(1);
+        token = await this.runFirstTimeAuth();
+        if (!token) {
+          console.log('Authentication required. Exiting.');
+          process.exit(1);
+        }
       }
 
       logInfo('Fetching deposit addresses...');
