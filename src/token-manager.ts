@@ -108,16 +108,18 @@ export class TokenManager {
         return null;
       }
 
-      const data = await response.json() as {
-        access_token: string;
-        refresh_token: string;
-        expires_in: number;
+      const json = await response.json() as {
+        success: boolean;
+        data: { access_token: string; refresh_token: string; expires_in: number };
       };
+      if (!json.success || !json.data) {
+        return null;
+      }
 
       const tokens: StoredTokens = {
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        expires_in: data.expires_in,
+        access_token: json.data.access_token,
+        refresh_token: json.data.refresh_token,
+        expires_in: json.data.expires_in,
         timestamp: Math.floor(Date.now() / 1000),
       };
 
