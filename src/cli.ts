@@ -223,7 +223,7 @@ export class CLI {
     hlSpot
       .command('buy')
       .description('Buy a token on Hyperliquid spot')
-      .requiredOption('--token <sym>', 'Token symbol to buy')
+      .requiredOption('--coin <sym>', 'Token symbol to buy')
       .requiredOption('--amount <n>', 'Amount in USDC to spend')
       .option('--price <p>', 'Limit price (omit for market)')
       .action((options) => this.handleHlSpot('buy', options));
@@ -231,7 +231,7 @@ export class CLI {
     hlSpot
       .command('sell')
       .description('Sell a token on Hyperliquid spot')
-      .requiredOption('--token <sym>', 'Token symbol to sell')
+      .requiredOption('--coin <sym>', 'Token symbol to sell')
       .requiredOption('--amount <n>', 'Amount of token to sell')
       .option('--price <p>', 'Limit price (omit for market)')
       .action((options) => this.handleHlSpot('sell', options));
@@ -563,11 +563,11 @@ export class CLI {
       const client = await this.createTradeClient();
       const body: Record<string, unknown> = {
         action,
-        token: options.token,
+        token: options.coin,
         amount: options.amount,
       };
       if (options.price) body.price = options.price;
-      logInfo(`HL-Spot ${action}: ${options.token} amount=${options.amount}`);
+      logInfo(`HL-Spot ${action}: ${options.coin} amount=${options.amount}`);
       const resp = await client.call('hl-spot', body);
       this.formatTradeResponse(resp);
     } catch (error) {
