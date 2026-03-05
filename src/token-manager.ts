@@ -1,119 +1,388 @@
 /**
- * Token Manager - Handles authentication token retrieval
+ * Token Manager - Handles authentication token lifecycle
  *
- * Priority order:
- * 1. CLI argument
- * 2. Environment variables (MCP_HUB_TOKEN, AIUSD_TOKEN)
- * 3. Local token file (~/.mcp-hub/token.json)
+ * Supports:
+ * - Token retrieval from CLI arg, env vars, or file
+ * - JWT refresh via refresh token
+ * - Recovery from stored mnemonic (challenge/verify flow)
+ * - Agent session creation and polling
+ *
+ * Storage: ~/.aiusd/token.json and ~/.aiusd/AIUSD_WALLET_DO_NOT_DELETE
  */
 
-import { readFile, access } from 'fs/promises';
+import { readFile, writeFile, access, mkdir } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
 
-export interface TokenData {
-  token: string;
-  timestamp?: number;
-  expires_in?: number;
+const AIUSD_DIR = join(homedir(), '.aiusd');
+const TOKEN_FILE = join(AIUSD_DIR, 'token.json');
+const MNEMONIC_FILE = join(AIUSD_DIR, 'AIUSD_WALLET_DO_NOT_DELETE');
+
+const API_BASE = 'https://production.alpha.dev/api/user-service';
+const CHALLENGE_URL = `${API_BASE}/v1/auth/challenge`;
+const VERIFY_URL = `${API_BASE}/v1/auth/verify`;
+const REFRESH_URL = `${API_BASE}/auth/refresh`;
+const AGENT_SESSION_URL = `${API_BASE}/v1/auth/agent-session`;
+
+export interface StoredTokens {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  timestamp: number;
 }
 
+export type AuthMethod = 'new-wallet' | 'existing-wallet' | 'mnemonic-restore';
+
 export class TokenManager {
-  private static getTokenFromEnv(): string | null {
-    const token = process.env.MCP_HUB_TOKEN || process.env.AIUSD_TOKEN;
-    if (token) {
-      console.log(`Loaded token from environment: ${token.slice(0, 50)}...`);
-      return token;
-    }
-    return null;
-  }
-
-  private static async getTokenFromFile(): Promise<string | null> {
-    const filePath = join(homedir(), '.mcp-hub', 'token.json');
-    try {
-      await access(filePath);
-      const content = await readFile(filePath, 'utf8');
-      const data: TokenData = JSON.parse(content);
-
-      if (data.timestamp && data.expires_in) {
-        const age = Date.now() / 1000 - data.timestamp;
-        if (age > data.expires_in) {
-          console.log('Token expired. Run: aiusd login');
-          return null;
-        }
-      }
-
-      const token = data.token;
-      if (token) {
-        console.log(`Loaded token from ${filePath}: ${token.slice(0, 50)}...`);
-        return token;
-      }
-    } catch {
-      // File doesn't exist or invalid format
-    }
-    return null;
-  }
-
+  /**
+   * Simple token retrieval with no side effects.
+   * Priority: CLI arg -> env vars (MCP_HUB_TOKEN, AIUSD_TOKEN) -> file (if not expired).
+   * Returns normalized "Bearer xxx" or null.
+   */
   static async getToken(cliToken?: string): Promise<string | null> {
     // 1. CLI argument
     if (cliToken) {
-      console.log(`Using token from CLI argument: ${cliToken.slice(0, 50)}...`);
       return this.normalizeToken(cliToken);
     }
 
     // 2. Environment variables
-    const envToken = this.getTokenFromEnv();
+    const envToken = process.env.MCP_HUB_TOKEN || process.env.AIUSD_TOKEN;
     if (envToken) {
       return this.normalizeToken(envToken);
     }
 
-    // 3. Local token file
-    const fileToken = await this.getTokenFromFile();
-    if (fileToken) {
-      return this.normalizeToken(fileToken);
+    // 3. Token file (only if not expired)
+    const stored = await this.readStoredTokens();
+    if (stored && !this.isExpired(stored)) {
+      return this.normalizeToken(stored.access_token);
     }
 
     return null;
   }
 
-  private static normalizeToken(token: string): string {
-    if (!token.startsWith('Bearer ')) {
-      return `Bearer ${token}`;
+  /**
+   * Main entry point for obtaining a valid token.
+   * Tries: getToken() -> refreshAccessToken() -> recoverFromMnemonic() -> null.
+   * When null is returned, the caller should handle first-time auth.
+   */
+  static async ensureToken(cliToken?: string): Promise<string | null> {
+    // Try simple retrieval first
+    const token = await this.getToken(cliToken);
+    if (token) {
+      return token;
     }
-    return token;
+
+    // Try refresh if we have a refresh token
+    const stored = await this.readStoredTokens();
+    if (stored?.refresh_token) {
+      const refreshed = await this.refreshAccessToken(stored.refresh_token);
+      if (refreshed) {
+        return this.normalizeToken(refreshed.access_token);
+      }
+    }
+
+    // Try mnemonic recovery
+    const recovered = await this.recoverFromMnemonic();
+    if (recovered) {
+      return this.normalizeToken(recovered.access_token);
+    }
+
+    // Caller must handle first-time auth
+    return null;
   }
 
-  static printTokenInstructions(): void {
-    console.log('No authentication token found');
-    console.log('');
-    console.log('Please set up authentication using one of these methods:');
-    console.log('');
-    console.log('1. Run OAuth login (recommended):');
-    console.log('   npm run oauth');
-    console.log('');
-    console.log('2. Environment variable:');
-    console.log('   export MCP_HUB_TOKEN="Bearer your_token_here"');
-    console.log('');
-    console.log('3. CLI argument:');
-    console.log('   aiusd --token "Bearer your_token_here" <command>');
+  /**
+   * Refresh the access token using a refresh token.
+   * POST /auth/refresh with the refresh token.
+   * Saves and returns new tokens on success, null on failure.
+   */
+  static async refreshAccessToken(refreshToken: string): Promise<StoredTokens | null> {
+    try {
+      const response = await fetch(REFRESH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json() as {
+        access_token: string;
+        refresh_token: string;
+        expires_in: number;
+      };
+
+      const tokens: StoredTokens = {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_in: data.expires_in,
+        timestamp: Math.floor(Date.now() / 1000),
+      };
+
+      await this.saveTokens(tokens);
+      return tokens;
+    } catch {
+      return null;
+    }
   }
 
+  /**
+   * Recover authentication from a stored mnemonic.
+   * Reads the mnemonic file, creates an ethers Wallet, and runs challengeVerify().
+   */
+  static async recoverFromMnemonic(): Promise<StoredTokens | null> {
+    try {
+      const mnemonic = await this.readMnemonic();
+      if (!mnemonic) {
+        return null;
+      }
+
+      const { Wallet } = await import('ethers');
+      const wallet = Wallet.fromPhrase(mnemonic.trim());
+      return await this.challengeVerify(wallet);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Full challenge/verify authentication flow.
+   * POST challenge -> sign message -> POST verify.
+   * Hex signature is converted to base64 before sending.
+   * Saves and returns tokens on success.
+   */
+  static async challengeVerify(wallet: { address: string; signMessage: (message: string) => Promise<string> }): Promise<StoredTokens | null> {
+    try {
+      const address = wallet.address.toLowerCase();
+
+      // Step 1: Request challenge
+      const challengeRes = await fetch(CHALLENGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain: 'aiusd.ai', chain_id: 'eip155:1', address }),
+      });
+
+      if (!challengeRes.ok) {
+        return null;
+      }
+
+      const challengeData = await challengeRes.json() as {
+        success: boolean;
+        data: { challenge_id: string; message: string };
+      };
+      if (!challengeData.success || !challengeData.data) {
+        return null;
+      }
+
+      const { challenge_id, message } = challengeData.data;
+
+      // Step 2: Sign the challenge message
+      const hexSignature = await wallet.signMessage(message);
+
+      // Step 3: Convert hex signature to base64
+      const hexClean = hexSignature.startsWith('0x') ? hexSignature.slice(2) : hexSignature;
+      const bytes = Buffer.from(hexClean, 'hex');
+      const base64Signature = bytes.toString('base64');
+
+      // Step 4: Verify signature
+      const verifyRes = await fetch(VERIFY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challenge_id, signature: base64Signature }),
+      });
+
+      if (!verifyRes.ok) {
+        return null;
+      }
+
+      const verifyData = await verifyRes.json() as {
+        success: boolean;
+        data: { access_token: string; refresh_token: string; expires_in: number };
+      };
+      if (!verifyData.success || !verifyData.data?.access_token) {
+        return null;
+      }
+
+      const tokens: StoredTokens = {
+        access_token: verifyData.data.access_token,
+        refresh_token: verifyData.data.refresh_token || '',
+        expires_in: verifyData.data.expires_in || 86400,
+        timestamp: Math.floor(Date.now() / 1000),
+      };
+
+      await this.saveTokens(tokens);
+      return tokens;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Create a new agent session for browser-based authentication.
+   * POST /auth/agent-session.
+   */
+  static async createAgentSession(): Promise<{ session_id: string; expires_at: string } | null> {
+    try {
+      const response = await fetch(AGENT_SESSION_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json() as { session_id: string; expires_at: string };
+      return { session_id: data.session_id, expires_at: data.expires_at };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Poll an agent session until it is completed or expired.
+   * GET /agent-session/{sessionId} every 2 seconds.
+   */
+  static async pollAgentSession(
+    sessionId: string,
+    expiresAt: string,
+  ): Promise<StoredTokens | null> {
+    const expiresTime = new Date(expiresAt).getTime();
+
+    while (Date.now() < expiresTime) {
+      try {
+        const response = await fetch(`${AGENT_SESSION_URL}/${sessionId}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (response.ok) {
+          const data = await response.json() as {
+            status: string;
+            access_token?: string;
+            refresh_token?: string;
+            expires_in?: number;
+          };
+
+          if (data.status === 'completed' && data.access_token && data.refresh_token && data.expires_in) {
+            const tokens: StoredTokens = {
+              access_token: data.access_token,
+              refresh_token: data.refresh_token,
+              expires_in: data.expires_in,
+              timestamp: Math.floor(Date.now() / 1000),
+            };
+
+            await this.saveTokens(tokens);
+            return tokens;
+          }
+        }
+      } catch {
+        // Network error, continue polling
+      }
+
+      // Wait 2 seconds before next poll
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+
+    return null;
+  }
+
+  /**
+   * Save a mnemonic phrase to the mnemonic file.
+   */
+  static async saveMnemonic(mnemonic: string): Promise<void> {
+    await mkdir(AIUSD_DIR, { recursive: true });
+    await writeFile(MNEMONIC_FILE, mnemonic, { encoding: 'utf8', mode: 0o600 });
+  }
+
+  /**
+   * Read the stored mnemonic phrase from the mnemonic file.
+   */
+  static async readMnemonic(): Promise<string | null> {
+    try {
+      await access(MNEMONIC_FILE);
+      const content = await readFile(MNEMONIC_FILE, 'utf8');
+      const trimmed = content.trim();
+      return trimmed || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Read stored tokens from token.json.
+   */
+  static async readStoredTokens(): Promise<StoredTokens | null> {
+    try {
+      await access(TOKEN_FILE);
+      const content = await readFile(TOKEN_FILE, 'utf8');
+      const data = JSON.parse(content) as StoredTokens;
+      if (data.access_token && data.refresh_token && data.expires_in && data.timestamp) {
+        return data;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Save tokens to token.json.
+   */
+  static async saveTokens(tokens: StoredTokens): Promise<void> {
+    await mkdir(AIUSD_DIR, { recursive: true });
+    await writeFile(TOKEN_FILE, JSON.stringify(tokens, null, 2), { encoding: 'utf8', mode: 0o600 });
+  }
+
+  /**
+   * Check if stored tokens are expired.
+   * Compares timestamp + expires_in against the current time.
+   */
+  static isExpired(tokens: StoredTokens): boolean {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    return nowSeconds >= tokens.timestamp + tokens.expires_in;
+  }
+
+  /**
+   * Ensure a token string has the "Bearer " prefix.
+   */
+  static normalizeToken(token: string): string {
+    if (token.startsWith('Bearer ')) {
+      return token;
+    }
+    return `Bearer ${token}`;
+  }
+
+  /**
+   * Validate that a token has the Bearer prefix and looks like a 3-part JWT.
+   */
   static validateToken(token: string): boolean {
     if (!token || typeof token !== 'string') {
       return false;
     }
 
     if (!token.startsWith('Bearer ')) {
-      console.log('Token should start with "Bearer "');
       return false;
     }
 
     const jwtPart = token.substring(7);
     const parts = jwtPart.split('.');
-    if (parts.length !== 3) {
-      console.log('Token does not appear to be a valid JWT');
-      return false;
-    }
+    return parts.length === 3;
+  }
 
-    return true;
+  /**
+   * The URL users should visit for agent-based browser authentication.
+   */
+  static get AGENT_AUTH_URL(): string {
+    return 'https://aiusd.ai/agent-auth';
+  }
+
+  /**
+   * The path to the mnemonic file.
+   */
+  static get MNEMONIC_FILE_PATH(): string {
+    return MNEMONIC_FILE;
   }
 }
