@@ -62,29 +62,31 @@ Bot: Done! Bought 0.65 SOL for $100 USDC. Tx: abc123...
 
 This package includes a `SKILL.md` that LLM-powered platforms use to understand AIUSD capabilities.
 
-### Installing via natural language
+### How it works
 
-Tell your AI assistant:
+1. **SKILL.md** tells the AI what AIUSD can do and how to use the `aiusd` CLI
+2. **`aiusd` CLI** (this npm package) executes commands on behalf of the user
+3. Both must be present: the skill file for the AI, and the CLI for execution
 
-> "Install the aiusd-skill"
+### OpenClaw
 
-Or manually:
+The skill is bundled with OpenClaw. The CLI dependency is declared in SKILL.md metadata — OpenClaw will prompt to install it via `npm install -g aiusd-skill` when the `aiusd` binary is missing.
+
+To install manually:
+
+```bash
+# Install the CLI globally
+npm install -g aiusd-skill
+
+# Verify
+aiusd --help
+```
+
+### Other platforms
 
 1. Copy `SKILL.md` to your platform's skills directory
 2. Install the CLI: `npm install -g aiusd-skill`
 3. The AI will use `aiusd` commands as described in SKILL.md
-
-### Installing on OpenClaw
-
-```bash
-# From npm
-openclaw skill install aiusd-skill
-
-# From local directory
-openclaw skill install /path/to/aiusd-skills
-```
-
-After installation, the bot can handle requests like "check my balance", "buy SOL", "stake AIUSD", etc.
 
 ## License
 

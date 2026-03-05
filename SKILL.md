@@ -3,6 +3,24 @@ name: aiusd-skill
 version: 2.0.0
 description: "AIUSD — trade crypto, earn yield, move money across chains."
 license: MIT
+metadata:
+  {
+    "openclaw":
+      {
+        "emoji": "💰",
+        "requires": { "bins": ["aiusd"] },
+        "install":
+          [
+            {
+              "id": "npm",
+              "kind": "npm",
+              "package": "aiusd-skill",
+              "bins": ["aiusd"],
+              "label": "Install AIUSD CLI (npm)",
+            },
+          ],
+      },
+  }
 ---
 
 # AIUSD Skill
