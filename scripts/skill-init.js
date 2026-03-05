@@ -145,14 +145,14 @@ class SkillSetup {
     }
 
     // Check for existing token file
-    const tokenFile = join(homedir(), '.mcp-hub', 'token.json');
+    const tokenFile = join(homedir(), '.aiusd', 'token.json');
     if (existsSync(tokenFile)) {
       try {
         const tokenData = JSON.parse(readFileSync(tokenFile, 'utf8'));
-        if (tokenData.token) {
+        if (tokenData.access_token) {
           const age = Date.now() / 1000 - (tokenData.timestamp || 0);
           if (age < (tokenData.expires_in || 86400)) {
-            logSuccess('Valid token found in ~/.mcp-hub/token.json');
+            logSuccess('Valid token found in ~/.aiusd/token.json');
             return;
           }
           logWarning('Token expired, will re-authenticate');

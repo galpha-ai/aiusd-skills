@@ -97,7 +97,7 @@ tmp/
 temp/
 
 # Auth tokens and credentials (security)
-.mcp-hub/
+.aiusd/
 auth.json
 token.json
 
