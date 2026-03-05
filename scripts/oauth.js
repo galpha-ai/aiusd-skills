@@ -21,8 +21,8 @@ import { join } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline';
 
-const CHALLENGE_URL = 'https://production.alpha.dev/api/user-service/v1/auth/challenge';
-const VERIFY_URL = 'https://production.alpha.dev/api/user-service/v1/auth/verify';
+const CHALLENGE_URL = 'https://staging.alpha.dev/api/user-service/v1/auth/challenge';
+const VERIFY_URL = 'https://staging.alpha.dev/api/user-service/v1/auth/verify';
 const AIUSD_DIR = join(homedir(), '.aiusd');
 const TOKEN_FILE = join(AIUSD_DIR, 'token.json');
 const MNEMONIC_FILE = join(AIUSD_DIR, 'AIUSD_WALLET_DO_NOT_DELETE');
@@ -114,7 +114,7 @@ async function run() {
     // 2. Challenge
     console.log('Requesting auth challenge...');
     const challengeRes = await callApi(CHALLENGE_URL, {
-      domain: 'aiusd.ai',
+      domain: 'staging.aiusd.ai',
       chain_id: 'eip155:1',
       address: address.toLowerCase(),
     });

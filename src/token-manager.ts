@@ -18,7 +18,7 @@ const AIUSD_DIR = join(homedir(), '.aiusd');
 const TOKEN_FILE = join(AIUSD_DIR, 'token.json');
 const MNEMONIC_FILE = join(AIUSD_DIR, 'AIUSD_WALLET_DO_NOT_DELETE');
 
-const API_BASE = 'https://production.alpha.dev/api/user-service';
+const API_BASE = 'https://staging.alpha.dev/api/user-service';
 const CHALLENGE_URL = `${API_BASE}/v1/auth/challenge`;
 const VERIFY_URL = `${API_BASE}/v1/auth/verify`;
 const REFRESH_URL = `${API_BASE}/v1/auth/refresh`;
@@ -161,7 +161,7 @@ export class TokenManager {
       const challengeRes = await fetch(CHALLENGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain: 'aiusd.ai', chain_id: 'eip155:1', address }),
+        body: JSON.stringify({ domain: 'staging.aiusd.ai', chain_id: 'eip155:1', address }),
       });
 
       if (!challengeRes.ok) {
@@ -234,8 +234,12 @@ export class TokenManager {
         return null;
       }
 
-      const data = await response.json() as { session_id: string; expires_at: string };
-      return { session_id: data.session_id, expires_at: data.expires_at };
+      const json = await response.json() as {
+        success: boolean;
+        data: { session_id: string; expires_at: string };
+      };
+      if (!json.success || !json.data) return null;
+      return { session_id: json.data.session_id, expires_at: json.data.expires_at };
     } catch {
       return null;
     }
@@ -259,14 +263,18 @@ export class TokenManager {
         });
 
         if (response.ok) {
-          const data = await response.json() as {
-            status: string;
-            access_token?: string;
-            refresh_token?: string;
-            expires_in?: number;
+          const json = await response.json() as {
+            success: boolean;
+            data: {
+              status: string;
+              access_token?: string;
+              refresh_token?: string;
+              expires_in?: number;
+            };
           };
+          const data = json.data;
 
-          if (data.status === 'completed' && data.access_token && data.refresh_token && data.expires_in) {
+          if (data?.status === 'completed' && data.access_token && data.refresh_token && data.expires_in) {
             const tokens: StoredTokens = {
               access_token: data.access_token,
               refresh_token: data.refresh_token,
@@ -376,7 +384,7 @@ export class TokenManager {
    * The URL users should visit for agent-based browser authentication.
    */
   static get AGENT_AUTH_URL(): string {
-    return 'https://aiusd.ai/agent-auth';
+    return 'https://staging.aiusd.ai/agent-auth';
   }
 
   /**
