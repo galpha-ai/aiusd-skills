@@ -139,7 +139,7 @@ class SkillSetup {
     logStep(3, 'Setting up authentication');
 
     // Check for existing valid token
-    if (process.env.MCP_HUB_TOKEN || process.env.AIUSD_TOKEN) {
+    if (process.env.AIUSD_TOKEN) {
       logSuccess('Environment token found');
       return;
     }
@@ -182,7 +182,7 @@ class SkillSetup {
       log('   AIUSD_MNEMONIC="word1 word2 ... word12" npm run login -- --non-interactive', 'cyan');
       log('', 'reset');
       log('3. Environment variable:', 'blue');
-      log('   export MCP_HUB_TOKEN="Bearer your_token_here"', 'cyan');
+      log('   export AIUSD_TOKEN="Bearer your_token_here"', 'cyan');
       log('', 'reset');
     }
   }

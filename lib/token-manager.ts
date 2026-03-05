@@ -11,7 +11,7 @@ import { join } from 'path';
 
 const AIUSD_DIR = join(homedir(), '.aiusd');
 const TOKEN_FILE = join(AIUSD_DIR, 'token.json');
-const REFRESH_URL = 'https://production.alpha.dev/api/user-service/auth/refresh';
+const REFRESH_URL = 'https://production.alpha.dev/api/user-service/v1/auth/refresh';
 
 export interface StoredTokens {
   access_token: string;
@@ -22,7 +22,7 @@ export interface StoredTokens {
 
 export class TokenManager {
   private static getTokenFromEnv(): string | null {
-    return process.env.MCP_HUB_TOKEN || process.env.AIUSD_TOKEN || null;
+    return process.env.AIUSD_TOKEN || null;
   }
 
   private static async readStoredTokens(): Promise<StoredTokens | null> {

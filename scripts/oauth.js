@@ -142,7 +142,7 @@ async function run() {
     // 5. Save tokens
     mkdirSync(AIUSD_DIR, { recursive: true });
     const tokenData = {
-      access_token: access_token.startsWith('Bearer ') ? access_token : `Bearer ${access_token}`,
+      access_token,
       refresh_token: refresh_token || '',
       expires_in: expires_in || 86400,
       timestamp: Math.floor(Date.now() / 1000),

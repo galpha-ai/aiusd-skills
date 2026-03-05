@@ -413,7 +413,7 @@ node scripts/oauth.js --non-interactive --private-key 0xabc123...  # ❌ WRONG
 npm run oauth -- --private-key 0xabc123...  # ✅ CORRECT
 ```
 
-No browser needed. Generates/restores an EVM wallet, authenticates via challenge/verify, saves token to `~/.mcp-hub/token.json`.
+No browser needed. Generates/restores an EVM wallet, authenticates via challenge/verify, saves token to `~/.aiusd/token.json`.
 
 ### When to Authenticate
 
@@ -442,18 +442,6 @@ Always reuse the wallet mnemonic when available to avoid creating orphan account
 ### Re-Login for Existing Users
 
 If a user has an existing wallet (created with private key or mnemonic) and needs to login again:
-
-#### Smart Login (Interactive)
-```bash
-npm run login
-# or
-npm run smart-login
-```
-This will:
-- Check current authentication status
-- Detect available credentials in environment
-- Show appropriate login options
-- Guide through the chosen method
 
 #### Direct Login Methods
 
@@ -489,7 +477,7 @@ npm run oauth
 - ANY wallet can access your AIUSD account once authenticated
 - Your AIUSD balance is stored on servers, NOT in the wallet
 - Wallet is just for authentication (like username/password)
-- Browser OAuth (mcporter) creates a NEW wallet but accesses SAME account
+- Re-authenticating with a different wallet still accesses the SAME AIUSD account
 
 ### Common Authentication Errors and Solutions
 
@@ -630,10 +618,9 @@ node dist/index.js test                  # test MCP connection
 ### Token Resolution Priority
 
 1. CLI argument (`--token`)
-2. Environment: `MCP_HUB_TOKEN` or `AIUSD_TOKEN`
-3. File: `~/.mcporter/credentials.json`
-4. CLI: `mcporter get-token`
-5. File: `~/.mcp-hub/token.json`
+2. Environment: `AIUSD_TOKEN`
+3. File: `~/.aiusd/token.json` (with auto-refresh if expired)
+4. Mnemonic recovery: `~/.aiusd/AIUSD_WALLET_DO_NOT_DELETE`
 
 ### Error Codes
 

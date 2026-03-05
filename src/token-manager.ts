@@ -21,7 +21,7 @@ const MNEMONIC_FILE = join(AIUSD_DIR, 'AIUSD_WALLET_DO_NOT_DELETE');
 const API_BASE = 'https://production.alpha.dev/api/user-service';
 const CHALLENGE_URL = `${API_BASE}/v1/auth/challenge`;
 const VERIFY_URL = `${API_BASE}/v1/auth/verify`;
-const REFRESH_URL = `${API_BASE}/auth/refresh`;
+const REFRESH_URL = `${API_BASE}/v1/auth/refresh`;
 const AGENT_SESSION_URL = `${API_BASE}/v1/auth/agent-session`;
 
 export interface StoredTokens {
@@ -36,7 +36,7 @@ export type AuthMethod = 'new-wallet' | 'existing-wallet' | 'mnemonic-restore';
 export class TokenManager {
   /**
    * Simple token retrieval with no side effects.
-   * Priority: CLI arg -> env vars (MCP_HUB_TOKEN, AIUSD_TOKEN) -> file (if not expired).
+   * Priority: CLI arg -> env var (AIUSD_TOKEN) -> file (if not expired).
    * Returns normalized "Bearer xxx" or null.
    */
   static async getToken(cliToken?: string): Promise<string | null> {
@@ -46,7 +46,7 @@ export class TokenManager {
     }
 
     // 2. Environment variables
-    const envToken = process.env.MCP_HUB_TOKEN || process.env.AIUSD_TOKEN;
+    const envToken = process.env.AIUSD_TOKEN;
     if (envToken) {
       return this.normalizeToken(envToken);
     }
