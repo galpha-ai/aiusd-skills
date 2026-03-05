@@ -140,6 +140,12 @@ export class CLI {
       .argument('[domain]', 'Domain name (spot, perp, hl-spot, prediction, monitor, market, account)')
       .action((domain) => this.handleGuide(domain));
 
+    // --- Login subcommand ---
+    this.program
+      .command('login')
+      .description('Authenticate with AIUSD (create wallet or browser login)')
+      .action(() => this.handleLogin());
+
     // --- Logout subcommand ---
     this.program
       .command('logout')
@@ -637,6 +643,23 @@ export class CLI {
   // -------------------------------------------------------------------------
   // Logout handler
   // -------------------------------------------------------------------------
+
+  private async handleLogin(): Promise<void> {
+    // Check if already authenticated
+    const existing = await TokenManager.ensureToken();
+    if (existing) {
+      logInfo('Already logged in.');
+      return;
+    }
+
+    const token = await this.runFirstTimeAuth();
+    if (token) {
+      logInfo('Login successful.');
+    } else {
+      logError('Login failed.');
+      process.exit(1);
+    }
+  }
 
   private async handleLogout(): Promise<void> {
     const { unlink } = await import('fs/promises');
