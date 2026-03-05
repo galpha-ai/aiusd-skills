@@ -22,7 +22,7 @@
  */
 
 import { Wallet } from 'ethers';
-import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
@@ -204,17 +204,8 @@ async function run() {
 
     logSuccess('Authentication successful');
 
-    // Step 5: Save token (clear mcporter credentials first so new token takes precedence)
+    // Step 5: Save token
     logStep(5, 'Saving token for MCP');
-    const mcporterDir = join(homedir(), '.mcporter');
-    if (existsSync(mcporterDir)) {
-      try {
-        rmSync(mcporterDir, { recursive: true });
-        log('Cleared old mcporter credentials so new token is used', 'cyan');
-      } catch (e) {
-        logWarning(`Could not clear mcporter: ${e.message}`);
-      }
-    }
     mkdirSync(MCP_HUB_DIR, { recursive: true });
 
     const tokenData = {

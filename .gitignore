@@ -98,10 +98,8 @@ temp/
 
 # Auth tokens and credentials (security)
 .mcp-hub/
-.mcporter/
 auth.json
 token.json
-credentials.json
 
 # Skill packages
 *.skill

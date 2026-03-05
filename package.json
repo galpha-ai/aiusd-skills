@@ -16,13 +16,9 @@
     "build-installers": "node scripts/build-js-installer.js && node scripts/build-sh-installer.js",
     "publish-cli": "cd packages/aiusd-skills && npm publish",
     "setup": "node scripts/skill-init.js",
-    "reauth": "node scripts/reauth.js",
-    "login": "node scripts/smart-login.js",
-    "smart-login": "node scripts/smart-login.js",
+    "login": "node scripts/oauth.js",
     "oauth": "node scripts/oauth.js",
-    "test-reauth": "node scripts/test-reauth.js",
-    "show-auth": "node scripts/show-auth-locations.js",
-    "postinstall": "patch-package && node scripts/skill-init.js"
+    "postinstall": "node scripts/skill-init.js"
   },
   "bin": {
     "aiusd-skill": "./dist/index.js"
@@ -30,7 +26,6 @@
   "files": [
     "dist/**/*",
     "src/**/*",
-    "patches/",
     "README.md",
     "SKILL.md",
     "skills/",
@@ -42,12 +37,10 @@
     "@modelcontextprotocol/sdk": "^1.10.0",
     "commander": "^12.0.0",
     "ethers": "^6.13.0",
-    "mcporter": "^0.7.3",
     "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "patch-package": "^8.0.1",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
   },

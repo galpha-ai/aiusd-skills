@@ -132,6 +132,13 @@ export class CLI {
 
     // --- Market subcommand ---
     this.setupMarketCommands();
+
+    // --- Guide subcommand ---
+    this.program
+      .command('guide')
+      .description('Get the latest usage guide for a domain')
+      .argument('[domain]', 'Domain name (spot, perp, hl-spot, prediction, monitor, market, account)')
+      .action((domain) => this.handleGuide(domain));
   }
 
   // -------------------------------------------------------------------------
@@ -174,6 +181,8 @@ export class CLI {
       .requiredOption('--size <n>', 'Position size in USD')
       .option('--leverage <n>', 'Leverage multiplier')
       .option('--price <p>', 'Limit price (omit for market)')
+      .option('--tp <p>', 'Take-profit trigger price')
+      .option('--sl <p>', 'Stop-loss trigger price')
       .action((options) => this.handlePerp('long', options));
 
     perp
@@ -183,6 +192,8 @@ export class CLI {
       .requiredOption('--size <n>', 'Position size in USD')
       .option('--leverage <n>', 'Leverage multiplier')
       .option('--price <p>', 'Limit price (omit for market)')
+      .option('--tp <p>', 'Take-profit trigger price')
+      .option('--sl <p>', 'Stop-loss trigger price')
       .action((options) => this.handlePerp('short', options));
 
     perp
@@ -238,7 +249,32 @@ export class CLI {
       .requiredOption('--outcome <outcome>', 'Outcome to buy (Yes or No)')
       .requiredOption('--amount <n>', 'Amount in USDC')
       .option('--price <p>', 'Max price per share (0-1)')
-      .action((options) => this.handlePmBuy(options));
+      .action((options) => this.handlePmOrder('buy', options));
+
+    pm
+      .command('sell')
+      .description('Sell shares in a prediction market')
+      .requiredOption('--market <slug>', 'Market slug or identifier')
+      .requiredOption('--outcome <outcome>', 'Outcome to sell (Yes or No)')
+      .requiredOption('--amount <n>', 'Number of shares to sell')
+      .option('--price <p>', 'Min price per share (0-1)')
+      .action((options) => this.handlePmOrder('sell', options));
+
+    pm
+      .command('cancel')
+      .description('Cancel an open prediction market order')
+      .requiredOption('--order-id <id>', 'Order ID to cancel')
+      .action((options) => this.handlePmCancel(options));
+
+    pm
+      .command('positions')
+      .description('List your prediction market positions')
+      .action(() => this.handleCallTool('genalpha_get_prediction_positions', { params: '{}' }));
+
+    pm
+      .command('orders')
+      .description('List your open prediction market orders')
+      .action(() => this.handleCallTool('genalpha_get_prediction_orders', { params: JSON.stringify({ status: 'open' }) }));
 
     pm
       .command('search')
@@ -265,6 +301,12 @@ export class CLI {
       .command('list')
       .description('List active conditional orders / monitors')
       .action(() => this.handleCallTool('genalpha_list_conditional_orders', { params: '{}' }));
+
+    monitor
+      .command('cancel')
+      .description('Cancel a conditional order / monitor')
+      .requiredOption('--order-id <id>', 'Order ID to cancel')
+      .action((options) => this.handleCallTool('genalpha_cancel_conditional_order', { params: JSON.stringify({ order_id: options.orderId }) }));
   }
 
   private setupMarketCommands(): void {
@@ -392,6 +434,8 @@ export class CLI {
       };
       if (options.leverage) body.leverage = parseInt(options.leverage, 10);
       if (options.price) body.price = options.price;
+      if (options.tp) body.take_profit = options.tp;
+      if (options.sl) body.stop_loss = options.sl;
       logInfo(`Perp ${action}: ${options.asset} size=${options.size}`);
       const resp = await client.call('perp', body);
       this.formatTradeResponse(resp);
@@ -419,21 +463,36 @@ export class CLI {
     }
   }
 
-  private async handlePmBuy(options: any): Promise<void> {
+  private async handlePmOrder(action: 'buy' | 'sell', options: any): Promise<void> {
     try {
       const client = await this.createTradeClient();
       const body: Record<string, unknown> = {
-        action: 'buy',
+        action,
         market: options.market,
         outcome: options.outcome,
         amount: options.amount,
       };
       if (options.price) body.price = options.price;
-      logInfo(`PM buy: ${options.outcome} on ${options.market} for ${options.amount} USDC`);
+      logInfo(`PM ${action}: ${options.outcome} on ${options.market} for ${options.amount}`);
       const resp = await client.call('prediction', body);
       this.formatTradeResponse(resp);
     } catch (error) {
-      logError(`PM buy failed: ${error instanceof Error ? error.message : error}`);
+      logError(`PM ${action} failed: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  }
+
+  private async handlePmCancel(options: any): Promise<void> {
+    try {
+      const client = await this.createTradeClient();
+      const body: Record<string, unknown> = {
+        order_id: options.orderId,
+      };
+      logInfo(`PM cancel: order ${options.orderId}`);
+      const resp = await client.call('cancel-prediction', body);
+      this.formatTradeResponse(resp);
+    } catch (error) {
+      logError(`PM cancel failed: ${error instanceof Error ? error.message : error}`);
       process.exit(1);
     }
   }
@@ -452,6 +511,39 @@ export class CLI {
       this.formatTradeResponse(resp);
     } catch (error) {
       logError(`Monitor add failed: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Guide handler (stateless, no auth)
+  // -------------------------------------------------------------------------
+
+  private async handleGuide(domain?: string): Promise<void> {
+    try {
+      const baseUrl = this.getServerBaseUrl();
+      if (!domain) {
+        const resp = await fetch(`${baseUrl}/api/trade/guides`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json() as { domains: string[] };
+        console.log('Available domains:');
+        data.domains.forEach((d: string) => console.log(`  - ${d}`));
+        console.log('\nUsage: aiusd guide <domain>');
+        return;
+      }
+      const resp = await fetch(`${baseUrl}/api/trade/guides/${domain}`);
+      if (!resp.ok) {
+        if (resp.status === 404) {
+          logError(`Unknown domain: ${domain}. Run 'aiusd guide' to see available domains.`);
+        } else {
+          logError(`Failed to fetch guide: HTTP ${resp.status}`);
+        }
+        process.exit(1);
+      }
+      const data = await resp.json() as { domain: string; version: string; guide: string };
+      console.log(data.guide);
+    } catch (error) {
+      logError(`Failed to fetch guide: ${error instanceof Error ? error.message : error}`);
       process.exit(1);
     }
   }

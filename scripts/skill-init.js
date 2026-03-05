@@ -173,13 +173,13 @@ class SkillSetup {
       logSuccess('Authentication completed');
     } catch (error) {
       logWarning('Auto-authentication failed');
-      log('\n📋 Manual Authentication Options:', 'yellow');
+      log('\nManual Authentication Options:', 'yellow');
       log('', 'reset');
-      log('1. Run OAuth manually:', 'blue');
-      log('   node scripts/oauth.js --non-interactive', 'cyan');
+      log('1. Run OAuth login:', 'blue');
+      log('   npm run login', 'cyan');
       log('', 'reset');
       log('2. Reuse existing wallet:', 'blue');
-      log('   AIUSD_MNEMONIC="word1 word2 ... word12" node scripts/oauth.js --non-interactive', 'cyan');
+      log('   AIUSD_MNEMONIC="word1 word2 ... word12" npm run login -- --non-interactive', 'cyan');
       log('', 'reset');
       log('3. Environment variable:', 'blue');
       log('   export MCP_HUB_TOKEN="Bearer your_token_here"', 'cyan');
