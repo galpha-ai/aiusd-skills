@@ -63,10 +63,13 @@ class SkillSetup {
       // Step 2: Build project
       await this.buildProject();
 
-      // Step 3: Check authentication
+      // Step 3: Register global CLI
+      await this.registerCLI();
+
+      // Step 4: Check authentication
       await this.checkAuthentication();
 
-      // Step 4: Test connection
+      // Step 5: Test connection
       await this.testConnection();
 
       log('\n Setup completed!', 'green');
@@ -119,8 +122,30 @@ class SkillSetup {
     }
   }
 
+  async registerCLI() {
+    logStep(3, 'Registering global CLI');
+
+    try {
+      const which = execSync('which aiusd 2>/dev/null || true', { encoding: 'utf8' }).trim();
+      if (which) {
+        logSuccess('aiusd command already available');
+        return;
+      }
+    } catch {}
+
+    try {
+      execSync('npm install -g .', {
+        cwd: this.projectRoot,
+        stdio: 'pipe'
+      });
+      logSuccess('aiusd command registered globally');
+    } catch (e) {
+      logWarning('Could not install globally. Run manually: npm install -g .');
+    }
+  }
+
   async checkAuthentication() {
-    logStep(3, 'Checking authentication');
+    logStep(4, 'Checking authentication');
 
     if (process.env.AIUSD_TOKEN) {
       logSuccess('Environment token found (AIUSD_TOKEN)');
@@ -152,7 +177,7 @@ class SkillSetup {
   }
 
   async testConnection() {
-    logStep(4, 'Testing connection');
+    logStep(5, 'Testing connection');
 
     try {
       execSync('node dist/index.js test', {

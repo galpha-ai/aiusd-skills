@@ -7,11 +7,15 @@
  * - Trade API operations (TradeClient)
  */
 
+import { createRequire } from 'module';
 import { Command } from 'commander';
 import { TokenManager } from './token-manager.js';
 import { MCPClient } from './mcp-client.js';
 import { TradeClient, type TradeResponse } from './trade-client.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+
+const require = createRequire(import.meta.url);
+const { version: PKG_VERSION } = require('../package.json');
 
 // Colors for console output
 const colors = {
@@ -56,9 +60,9 @@ export class CLI {
 
   private setupCommands(): void {
     this.program
-      .name('aiusd-client')
+      .name('aiusd')
       .description('AIUSD Skills MCP Client using official TypeScript SDK')
-      .version('1.0.0')
+      .version(PKG_VERSION)
       .option('-s, --server <url>', 'MCP server URL', this.defaultServerUrl)
       .option('-t, --token <token>', 'Bearer token for authentication')
       .option('--timeout <ms>', 'Request timeout in milliseconds', '30000');

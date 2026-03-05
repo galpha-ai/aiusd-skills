@@ -1,93 +1,93 @@
-# AIUSD Skill
+# AIUSD Skill for OpenClaw
 
-Trade crypto, earn yield, and manage funds across chains — all through natural conversation.
+The official AIUSD trading skill for your personal AI assistant. Trade crypto, check balances, earn yield, trade futures, bet on predictions, and manage funds — all through natural conversation in Telegram, Discord, WhatsApp, or any platform your bot supports.
 
-## Installation
+## Install the Skill
 
+**Option A: Drag & Drop (Easiest)**
+1. Download the skill file: **[Download aiusd-skill-agent.skill](https://github.com/galpha-ai/aiusd-skills/releases/latest/download/aiusd-skill-agent.skill)**
+2. Open your chat (Telegram, Discord, WhatsApp, etc.)
+3. Drag and drop the `.skill` file into the chat
+4. Your bot will automatically install the skill
+
+**Option B: npx (one command)**
 ```bash
-npm install -g aiusd-skill
+npx aiusd-skills install
 ```
 
-This makes the `aiusd` command available globally. Alternatively, use `npx aiusd-skill` without global install.
+**Option C: Manual**
+1. [Download aiusd-skill-agent.skill](https://github.com/galpha-ai/aiusd-skills/releases/latest/download/aiusd-skill-agent.skill) and extract: `tar -xzf aiusd-skill-agent.skill`
+2. Copy the extracted folder to your OpenClaw skills directory
+3. Restart your bot
 
-## Quick Start
+## Authentication
 
-```bash
-# Log in (create new account or browser sign-in)
-aiusd login
+When the skill is first used, the bot will ask how to log in:
 
-# Check your balance
-aiusd balances
+1. **Create new account** — set up a fresh wallet
+2. **Browser login** — sign in with an existing account via browser
 
-# Get usage guide for any domain
-aiusd guide spot
-aiusd guide perp
-aiusd guide account
-```
+The bot handles everything — just pick an option and follow the instructions.
 
-## What You Can Do
+To re-login or switch account, tell your bot: "logout" then "login".
 
-| Domain | Description |
-|--------|------------|
-| **account** | Balances, deposits, withdrawals, staking, gas top-up |
-| **spot** | Buy/sell/swap tokens on Solana, Ethereum, Base, Arbitrum, BSC, Polygon |
-| **perp** | HyperLiquid perpetual futures with leverage, TP/SL |
-| **hl-spot** | HyperLiquid spot trading |
-| **prediction** | Polymarket — search markets, buy/sell shares |
-| **monitor** | Watch X accounts for trade signals, conditional auto-buy |
-| **market** | Trending tokens, xStock prices, FourMeme trends |
+## What You Can Ask Your Bot
 
-## Example Conversation
+### Account & Balance
+- "What's my balance?"
+- "Show my trading addresses"
+- "Show my recent transactions"
 
-```
-You: What's my balance?
-Bot: Checking... You have 1,250 AIUSD in custody, 2,500 sAIUSD staked.
+### Spot Trading
+- "Buy $100 of SOL"
+- "Sell all my ETH"
+- "Swap TRUMP for USDC on Solana"
+- "Buy ETH on Base"
 
-You: Buy $100 of SOL
-Bot: Buy $100 of SOL on Solana with USDC — confirm?
+### Perpetual Futures
+- "Long ETH 10x"
+- "Short BTC at $70k"
+- "Close my ETH position"
 
-You: Yes
-Bot: Done! Bought 0.65 SOL for $100 USDC. Tx: abc123...
-```
+### HyperLiquid Spot
+- "Buy HYPE on HyperLiquid"
 
-## Deposits
+### Prediction Markets
+- "Bet $10 on Yes for Bitcoin 100k"
+- "Search election markets"
+- "Show my prediction positions"
 
-- **Website**: https://aiusd.ai — supports multiple stablecoins
-- **Direct deposit**: `aiusd get-deposit-address`
-  - Tron: USDT only
-  - All other chains: USDC only
-  - Minimum: $10
+### Monitoring & Signals
+- "Monitor @elonmusk with $100 budget"
+- "List my active monitors"
 
-## For AI Platforms (OpenClaw, Claude Code, etc.)
+### Market Data
+- "What tokens are trending?"
+- "Show xStock prices"
 
-This package includes a `SKILL.md` that LLM-powered platforms use to understand AIUSD capabilities.
+### Staking & Yield
+- "Stake 500 AIUSD"
+- "Unstake my AIUSD"
 
-### How it works
+### Deposits
+- "How do I deposit?"
+- "What are my deposit addresses?"
 
-1. **SKILL.md** tells the AI what AIUSD can do and how to use the `aiusd` CLI
-2. **`aiusd` CLI** (this npm package) executes commands on behalf of the user
-3. Both must be present: the skill file for the AI, and the CLI for execution
+## Supported Platforms
 
-### OpenClaw
+This skill works with OpenClaw on:
+- **Telegram** — Private chats and groups
+- **Discord** — Direct messages and server channels
+- **WhatsApp** — Personal and business accounts
+- **Slack** — Workspaces and direct messages
+- **CLI** — Command line interface
 
-The skill is bundled with OpenClaw. The CLI dependency is declared in SKILL.md metadata — OpenClaw will prompt to install it via `npm install -g aiusd-skill` when the `aiusd` binary is missing.
+## Privacy & Security
 
-To install manually:
+- **Local first**: your bot runs locally, your data stays private
+- **Secure storage**: authentication tokens stored locally on your device
+- **Open source**: skill code is transparent and auditable
 
-```bash
-# Install the CLI globally
-npm install -g aiusd-skill
+---
 
-# Verify
-aiusd --help
-```
-
-### Other platforms
-
-1. Copy `SKILL.md` to your platform's skills directory
-2. Install the CLI: `npm install -g aiusd-skill`
-3. The AI will use `aiusd` commands as described in SKILL.md
-
-## License
-
-MIT
+**Website**: https://aiusd.ai | **License**: MIT

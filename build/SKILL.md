@@ -3,24 +3,6 @@ name: aiusd-skill
 version: 2.0.0
 description: "AIUSD — trade crypto, earn yield, move money across chains."
 license: MIT
-metadata:
-  {
-    "openclaw":
-      {
-        "emoji": "💰",
-        "requires": { "bins": ["aiusd"] },
-        "install":
-          [
-            {
-              "id": "npm",
-              "kind": "npm",
-              "package": "aiusd-skill",
-              "bins": ["aiusd"],
-              "label": "Install AIUSD CLI (npm)",
-            },
-          ],
-      },
-  }
 ---
 
 # AIUSD Skill
@@ -75,9 +57,26 @@ Before executing commands in a domain, run `aiusd guide <domain>` to get the lat
 
 Fallback: if `aiusd guide` is unreachable, refer to static files in `skills/` directory.
 
+## Domain Knowledge
+
+### AIUSD is not a token
+
+AIUSD is a centralized balance pegged 1:1 to USDT. It is not a token on any blockchain — there is no contract address, no on-chain balance to query. AIUSD can be used to buy tokens on any supported chain. The conversion path (AIUSD → stablecoin → DEX → target token) is handled internally by the CLI; do not attempt to orchestrate it manually.
+
+### Always guide before operate
+
+Do not guess command syntax or parameters from memory. Before executing commands in any domain, run `aiusd guide <domain>` to get the current reference. Guides may change between CLI versions.
+
+### Token names can be ambiguous
+
+The same token symbol may exist on multiple chains (e.g., USDC on Solana, Base, Arbitrum). When the user's intent is ambiguous, ask which chain before executing. If the user has a clear preference from context (e.g., "buy SOL" implies Solana), proceed without asking.
+
+### Follow `next_steps`, don't re-confirm
+
+When a command returns `action_required` with `next_steps`, execute those steps directly. The user has already confirmed the intent — do not ask again unless the next step involves a different action than what was originally requested.
+
 ## Rules
 
-1. Follow guide/command outputs exactly — especially `next_steps` when status is `action_required`.
-2. Always confirm trades with user before executing.
-3. Never expose internal details (JSON responses, tool names, file paths) to users.
-4. Present results in clear, conversational language.
+1. Always confirm trades with the user before executing.
+2. Never expose internal details (JSON responses, tool names, file paths) to users.
+3. Present results in clear, conversational language.
