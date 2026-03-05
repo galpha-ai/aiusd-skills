@@ -10,6 +10,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { CallToolResult, ListToolsResult, Tool } from '@modelcontextprotocol/sdk/types.js';
+import { TokenManager } from './token-manager.js';
 
 export interface MCPClientOptions {
   serverUrl: string;
@@ -35,15 +36,27 @@ export class MCPClient {
     try {
       console.log(`🔄 Connecting to MCP server: ${this.options.serverUrl}`);
 
-      // Create custom fetch function with Bearer token
+      // Create custom fetch function with Bearer token and 401 auto-refresh
       const authFetch = async (url: string | URL | Request, init?: RequestInit) => {
         const headers = new Headers(init?.headers);
         headers.set('Authorization', this.options.authToken);
 
-        return fetch(url, {
-          ...init,
-          headers,
-        });
+        const response = await fetch(url, { ...init, headers });
+
+        if (response.status === 401) {
+          const stored = await TokenManager.readStoredTokens();
+          if (stored?.refresh_token) {
+            const refreshed = await TokenManager.refreshAccessToken(stored.refresh_token);
+            if (refreshed) {
+              this.options.authToken = TokenManager.normalizeToken(refreshed.access_token);
+              const retryHeaders = new Headers(init?.headers);
+              retryHeaders.set('Authorization', this.options.authToken);
+              return fetch(url, { ...init, headers: retryHeaders });
+            }
+          }
+        }
+
+        return response;
       };
 
       // Create HTTP transport with Bearer token
