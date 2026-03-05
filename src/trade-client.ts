@@ -27,6 +27,13 @@ export class TradeClient {
       headers: { 'Authorization': token, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (!response.ok) {
+      try {
+        return await response.json() as TradeResponse;
+      } catch {
+        return { status: 'error', reason: `HTTP ${response.status}: ${response.statusText}` };
+      }
+    }
     return await response.json() as TradeResponse;
   }
 }

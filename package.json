@@ -33,6 +33,7 @@
     "patches/",
     "README.md",
     "SKILL.md",
+    "skills/",
     "scripts/",
     "package.json",
     "tsconfig.json"

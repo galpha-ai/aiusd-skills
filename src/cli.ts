@@ -377,16 +377,22 @@ export class CLI {
   private async handlePerp(action: 'long' | 'short' | 'close', options: any): Promise<void> {
     try {
       const client = await this.createTradeClient();
-      const body: Record<string, unknown> = {
-        action,
-        asset: options.asset,
-      };
-      if (action !== 'close') {
-        body.size = options.size;
-        if (options.leverage) body.leverage = parseFloat(options.leverage);
-        if (options.price) body.price = parseFloat(options.price);
+
+      if (action === 'close') {
+        logInfo(`Perp close: ${options.asset}`);
+        const resp = await client.call('close-perp', { asset: options.asset });
+        this.formatTradeResponse(resp);
+        return;
       }
-      logInfo(`Perp ${action}: ${options.asset}${action !== 'close' ? ' size=' + options.size : ''}`);
+
+      const body: Record<string, unknown> = {
+        direction: action,
+        asset: options.asset,
+        size: options.size,
+      };
+      if (options.leverage) body.leverage = parseInt(options.leverage, 10);
+      if (options.price) body.price = options.price;
+      logInfo(`Perp ${action}: ${options.asset} size=${options.size}`);
       const resp = await client.call('perp', body);
       this.formatTradeResponse(resp);
     } catch (error) {
@@ -403,7 +409,7 @@ export class CLI {
         token: options.token,
         amount: options.amount,
       };
-      if (options.price) body.price = parseFloat(options.price);
+      if (options.price) body.price = options.price;
       logInfo(`HL-Spot ${action}: ${options.token} amount=${options.amount}`);
       const resp = await client.call('hl-spot', body);
       this.formatTradeResponse(resp);
@@ -422,9 +428,9 @@ export class CLI {
         outcome: options.outcome,
         amount: options.amount,
       };
-      if (options.price) body.price = parseFloat(options.price);
+      if (options.price) body.price = options.price;
       logInfo(`PM buy: ${options.outcome} on ${options.market} for ${options.amount} USDC`);
-      const resp = await client.call('pm', body);
+      const resp = await client.call('prediction', body);
       this.formatTradeResponse(resp);
     } catch (error) {
       logError(`PM buy failed: ${error instanceof Error ? error.message : error}`);
@@ -436,9 +442,8 @@ export class CLI {
     try {
       const client = await this.createTradeClient();
       const body: Record<string, unknown> = {
-        action: 'add',
         handle: options.handle,
-        budget: parseFloat(options.budget),
+        budget: options.budget,
       };
       if (options.tp) body.take_profit = options.tp;
       if (options.sl) body.stop_loss = options.sl;
