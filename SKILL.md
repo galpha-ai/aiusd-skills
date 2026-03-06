@@ -34,7 +34,7 @@ When a user wants to get started or is not yet logged in, run `aiusd login`. Pre
 
 The CLI prompts with choices `a/b/c`. Map the user's choice:
 - User picks **Create new account** → pipe `a` into the CLI. The CLI creates a wallet and authenticates automatically.
-- User picks **Browser login** → pipe `b` into the CLI **and run it in the background**. The CLI outputs a URL then blocks waiting for sign-in. Read the URL from the background output and present it to the user. The process completes automatically once the user signs in.
+- User picks **Browser login** → pipe `b` into the CLI **and run it in the background**. The CLI prints a URL starting with `https://` that contains `agent-auth?sid=agent_ses_`. You MUST read the actual output from the background process, find the real URL, and send it to the user verbatim. **NEVER fabricate or guess the URL — the session ID is a unique UUID that only the server knows.** The process completes automatically once the user signs in.
 
 Do NOT offer "restore from backup" (option `c`) unless the user explicitly asks.
 

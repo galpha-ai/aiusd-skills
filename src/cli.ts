@@ -51,7 +51,7 @@ function logWarning(message: string): void {
 
 export class CLI {
   private program: Command;
-  private defaultServerUrl = 'https://mcp.staging.alpha.dev/api/mcp-hub/mcp';
+  private defaultServerUrl = 'https://mcp.alpha.dev/api/mcp-hub/mcp';
 
   constructor() {
     this.program = new Command();
@@ -838,7 +838,7 @@ export class CLI {
       logInfo('Fetching deposit addresses...');
 
       // Call the deposit addresses API directly
-      const response = await fetch('https://staging.alpha.dev/api/user-service/users/deposit-addresses/refresh', {
+      const response = await fetch('https://production.alpha.dev/api/user-service/users/deposit-addresses/refresh', {
         method: 'POST',
         headers: {
           'Authorization': token,

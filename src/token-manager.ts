@@ -18,7 +18,7 @@ const AIUSD_DIR = join(homedir(), '.aiusd');
 const TOKEN_FILE = join(AIUSD_DIR, 'token.json');
 const MNEMONIC_FILE = join(AIUSD_DIR, 'AIUSD_WALLET_DO_NOT_DELETE');
 
-const API_BASE = 'https://staging.alpha.dev/api/user-service';
+const API_BASE = 'https://production.alpha.dev/api/user-service';
 const CHALLENGE_URL = `${API_BASE}/v1/auth/challenge`;
 const VERIFY_URL = `${API_BASE}/v1/auth/verify`;
 const REFRESH_URL = `${API_BASE}/v1/auth/refresh`;
@@ -163,7 +163,7 @@ export class TokenManager {
       const challengeRes = await fetch(CHALLENGE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain: 'staging.aiusd.ai', chain_id: 'eip155:1', address }),
+        body: JSON.stringify({ domain: 'aiusd.ai', chain_id: 'eip155:1', address }),
       });
 
       if (!challengeRes.ok) {
@@ -386,7 +386,7 @@ export class TokenManager {
    * The URL users should visit for agent-based browser authentication.
    */
   static get AGENT_AUTH_URL(): string {
-    return 'https://staging.aiusd.ai/agent-auth';
+    return 'https://aiusd.ai/agent-auth';
   }
 
   /**
