@@ -67,12 +67,11 @@ async function buildSkill() {
       'README.md',
       'SKILL.md',
       'skills/',
-      'scripts/',
       'dist/',
-      'src/',
-      'patches/',
-      'tsconfig.json'
     ];
+
+    // Only include skill-init.js from scripts/ (postinstall hook)
+    const scriptsToCopy = ['scripts/skill-init.js'];
 
     // Note: Excluding node_modules to keep package size under 5MB limit
     // Users will need to run 'npm install' after extracting
@@ -83,15 +82,24 @@ async function buildSkill() {
 
       if (existsSync(srcPath)) {
         if (file.endsWith('/')) {
-          // Directory
           execSync(`cp -R "${srcPath}" "${destPath}"`, { stdio: 'pipe' });
         } else {
-          // File
           execSync(`cp "${srcPath}" "${destPath}"`, { stdio: 'pipe' });
         }
         log(`   ✅ Copied ${file}`, 'green');
       } else {
         log(`   ⚠️  Skipped ${file} (not found)`, 'yellow');
+      }
+    }
+
+    // Copy only the postinstall script from scripts/
+    execSync(`mkdir -p "${join(tempBuildDir, 'scripts')}"`, { stdio: 'pipe' });
+    for (const script of scriptsToCopy) {
+      const srcPath = join(projectRoot, script);
+      const destPath = join(tempBuildDir, script);
+      if (existsSync(srcPath)) {
+        execSync(`cp "${srcPath}" "${destPath}"`, { stdio: 'pipe' });
+        log(`   ✅ Copied ${script}`, 'green');
       }
     }
 

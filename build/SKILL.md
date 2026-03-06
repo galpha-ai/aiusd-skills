@@ -9,6 +9,10 @@ license: MIT
 
 AIUSD is a unified crypto account that lets users trade tokens on any chain, leverage perpetual futures, bet on prediction markets, earn yield by staking, and move funds — all through a single CLI.
 
+## CLI entry point
+
+All commands in this skill use `aiusd` as the CLI. If `aiusd` is not in PATH, use `node dist/index.js` instead (e.g., `node dist/index.js login`). **NEVER use `dist/cli.js` — it is a library module, not an entry point.**
+
 ## When to use this skill
 
 Trigger this skill when the user wants to:
@@ -28,11 +32,11 @@ When a user wants to get started or is not yet logged in, run `aiusd login`. Pre
 1. **Create new account** — set up a fresh wallet
 2. **Browser login** — sign in with an existing account via browser
 
-After the user chooses, select the corresponding option at the CLI prompt:
-- **Create new account**: the CLI creates a wallet and authenticates automatically.
-- **Browser login**: the CLI outputs a URL — send it to the user to open in their browser. The CLI waits until sign-in completes.
+The CLI prompts with choices `a/b/c`. Map the user's choice:
+- User picks **Create new account** → pipe `a` into the CLI. The CLI creates a wallet and authenticates automatically.
+- User picks **Browser login** → pipe `b` into the CLI **and run it in the background**. The CLI outputs a URL then blocks waiting for sign-in. Read the URL from the background output and present it to the user. The process completes automatically once the user signs in.
 
-Do NOT offer "restore from backup" unless the user explicitly asks.
+Do NOT offer "restore from backup" (option `c`) unless the user explicitly asks.
 
 | Command | Description |
 |---------|------------|

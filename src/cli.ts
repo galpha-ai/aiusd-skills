@@ -649,8 +649,9 @@ export class CLI {
   // -------------------------------------------------------------------------
 
   private async handleLogin(): Promise<void> {
-    // Check if already authenticated
-    const existing = await TokenManager.ensureToken();
+    // Only check stored token file — do NOT use ensureToken() which
+    // auto-recovers from mnemonic and would bypass the login flow.
+    const existing = await TokenManager.getToken();
     if (existing) {
       logInfo('Already logged in.');
       return;

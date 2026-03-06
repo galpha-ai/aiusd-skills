@@ -192,7 +192,7 @@ export class TokenManager {
       const verifyRes = await fetch(VERIFY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ challenge_id, signature: base64Signature }),
+        body: JSON.stringify({ challenge_id, signature: base64Signature, domain: 'agent' }),
       });
 
       if (!verifyRes.ok) {

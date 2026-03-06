@@ -1,7 +1,7 @@
 {
   "packageName": "aiusd-skill-agent",
   "skillFile": "aiusd-skill-agent.skill",
-  "buildTime": "2026-03-05T20:44:56.991Z",
+  "buildTime": "2026-03-06T03:32:09.146Z",
   "version": "2.0.0",
-  "size": "63K"
+  "size": "35K"
 }
