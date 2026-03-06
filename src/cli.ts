@@ -4,13 +4,18 @@
  * Provides user-friendly commands that combine:
  * - Token management (TokenManager)
  * - MCP client operations (MCPClient)
+ * - Trade API operations (TradeClient)
  */
 
+import { createRequire } from 'module';
 import { Command } from 'commander';
 import { TokenManager } from './token-manager.js';
 import { MCPClient } from './mcp-client.js';
-import { buildIntentXml } from './intent-builder.js';
+import { TradeClient, type TradeResponse } from './trade-client.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+
+const require = createRequire(import.meta.url);
+const { version: PKG_VERSION } = require('../package.json');
 
 // Colors for console output
 const colors = {
@@ -55,9 +60,9 @@ export class CLI {
 
   private setupCommands(): void {
     this.program
-      .name('aiusd-client')
+      .name('aiusd')
       .description('AIUSD Skills MCP Client using official TypeScript SDK')
-      .version('1.0.0')
+      .version(PKG_VERSION)
       .option('-s, --server <url>', 'MCP server URL', this.defaultServerUrl)
       .option('-t, --token <token>', 'Bearer token for authentication')
       .option('--timeout <ms>', 'Request timeout in milliseconds', '30000');
@@ -107,49 +112,289 @@ export class CLI {
         this.handleCallTool('genalpha_get_transactions', { ...options, params });
       });
 
-    // Trade command — structured parameters, deterministic XML construction
-    this.program
-      .command('trade')
-      .description('Execute a trade (builds intent XML automatically)')
-      .requiredOption('-a, --action <action>', 'buy or sell')
-      .requiredOption('-b, --base <token>', 'Token to buy/sell (symbol or address)')
-      .option('-q, --quote <token>', 'Token to pay with (default: USDC)', 'USDC')
-      .requiredOption('--amount <amount>', 'Amount (number or "all" for sell)')
-      .requiredOption('-c, --chain <chain>', 'Blockchain: solana, ethereum, base, arbitrum, bsc, polygon')
-      .option('--take-profit <percent>', 'Take-profit percentage')
-      .option('--stop-loss <percent>', 'Stop-loss percentage')
-      .option('--dry-run', 'Print the generated XML without executing')
-      .option('--pretty', 'Pretty-print the result')
-      .action((options) => this.handleTrade(options));
-
     // Get deposit address command
     this.program
       .command('get-deposit-address')
       .description('Get your AIUSD deposit addresses for all supported chains')
       .option('--pretty', 'Pretty-print the result')
       .action((options) => this.handleGetDepositAddress(options));
+
+    // --- Spot subcommand ---
+    this.setupSpotCommands();
+
+    // --- Perp subcommand ---
+    this.setupPerpCommands();
+
+    // --- HL-Spot subcommand ---
+    this.setupHlSpotCommands();
+
+    // --- PM (Prediction Markets) subcommand ---
+    this.setupPmCommands();
+
+    // --- Monitor subcommand ---
+    this.setupMonitorCommands();
+
+    // --- Market subcommand ---
+    this.setupMarketCommands();
+
+    // --- Guide subcommand ---
+    this.program
+      .command('guide')
+      .description('Get the latest usage guide for a domain')
+      .argument('[domain]', 'Domain name (spot, perp, hl-spot, prediction, monitor, market, account)')
+      .action((domain) => this.handleGuide(domain));
+
+    // --- Login subcommand ---
+    this.program
+      .command('login')
+      .description('Authenticate with AIUSD (create wallet or browser login)')
+      .action(() => this.handleLogin());
+
+    // --- Logout subcommand ---
+    this.program
+      .command('logout')
+      .description('Remove stored tokens and sign out')
+      .action(() => this.handleLogout());
+  }
+
+  // -------------------------------------------------------------------------
+  // Subcommand groups
+  // -------------------------------------------------------------------------
+
+  private setupSpotCommands(): void {
+    const spot = this.program
+      .command('spot')
+      .description('Spot trading on DEXes');
+
+    spot
+      .command('buy')
+      .description('Buy a token on a DEX')
+      .requiredOption('-b, --base <token>', 'Token to buy (symbol or address)')
+      .requiredOption('-a, --amount <amount>', 'Amount of quote token to spend')
+      .option('-q, --quote <token>', 'Quote token (default: USDC)', 'USDC')
+      .option('-c, --chain <chain>', 'Blockchain (default: solana)', 'solana')
+      .action((options) => this.handleSpot('buy', options));
+
+    spot
+      .command('sell')
+      .description('Sell a token on a DEX')
+      .requiredOption('-b, --base <token>', 'Token to sell (symbol or address)')
+      .requiredOption('-a, --amount <amount>', 'Amount to sell (number, "all", or "50%")')
+      .option('-q, --quote <token>', 'Quote token (default: USDC)', 'USDC')
+      .option('-c, --chain <chain>', 'Blockchain (default: solana)', 'solana')
+      .action((options) => this.handleSpot('sell', options));
+  }
+
+  private setupPerpCommands(): void {
+    const perp = this.program
+      .command('perp')
+      .description('Perpetual futures on Hyperliquid');
+
+    perp
+      .command('long')
+      .description('Open a long perpetual position')
+      .requiredOption('--asset <sym>', 'Asset symbol (e.g. BTC, ETH)')
+      .requiredOption('--size <n>', 'Position size in USD')
+      .option('--leverage <n>', 'Leverage multiplier')
+      .option('--price <p>', 'Limit price (omit for market)')
+      .option('--tp <p>', 'Take-profit trigger price')
+      .option('--sl <p>', 'Stop-loss trigger price')
+      .action((options) => this.handlePerp('long', options));
+
+    perp
+      .command('short')
+      .description('Open a short perpetual position')
+      .requiredOption('--asset <sym>', 'Asset symbol (e.g. BTC, ETH)')
+      .requiredOption('--size <n>', 'Position size in USD')
+      .option('--leverage <n>', 'Leverage multiplier')
+      .option('--price <p>', 'Limit price (omit for market)')
+      .option('--tp <p>', 'Take-profit trigger price')
+      .option('--sl <p>', 'Stop-loss trigger price')
+      .action((options) => this.handlePerp('short', options));
+
+    perp
+      .command('close')
+      .description('Close a perpetual position')
+      .requiredOption('--asset <sym>', 'Asset symbol to close')
+      .action((options) => this.handlePerp('close', options));
+
+    perp
+      .command('deposit')
+      .description('Deposit USDC to Hyperliquid')
+      .requiredOption('--amount <n>', 'Amount of USDC to deposit')
+      .action((options) => this.handleCallTool('genalpha_deposit_to_hl', { params: JSON.stringify({ amount: parseFloat(options.amount) }) }));
+
+    perp
+      .command('withdraw')
+      .description('Withdraw USDC from Hyperliquid')
+      .requiredOption('--amount <n>', 'Amount of USDC to withdraw')
+      .action((options) => this.handleCallTool('genalpha_withdraw_from_hl', { params: JSON.stringify({ amount: parseFloat(options.amount) }) }));
+  }
+
+  private setupHlSpotCommands(): void {
+    const hlSpot = this.program
+      .command('hl-spot')
+      .description('Spot trading on Hyperliquid');
+
+    hlSpot
+      .command('buy')
+      .description('Buy a token on Hyperliquid spot')
+      .requiredOption('--coin <sym>', 'Token symbol to buy')
+      .requiredOption('--amount <n>', 'Amount in USDC to spend')
+      .option('--price <p>', 'Limit price (omit for market)')
+      .action((options) => this.handleHlSpot('buy', options));
+
+    hlSpot
+      .command('sell')
+      .description('Sell a token on Hyperliquid spot')
+      .requiredOption('--coin <sym>', 'Token symbol to sell')
+      .requiredOption('--amount <n>', 'Amount of token to sell')
+      .option('--price <p>', 'Limit price (omit for market)')
+      .action((options) => this.handleHlSpot('sell', options));
+  }
+
+  private setupPmCommands(): void {
+    const pm = this.program
+      .command('pm')
+      .description('Prediction markets (Polymarket)');
+
+    pm
+      .command('buy')
+      .description('Buy shares in a prediction market')
+      .requiredOption('--market <slug>', 'Market slug or identifier')
+      .requiredOption('--outcome <outcome>', 'Outcome to buy (Yes or No)')
+      .requiredOption('--amount <n>', 'Amount in USDC')
+      .option('--price <p>', 'Max price per share (0-1)')
+      .action((options) => this.handlePmOrder('buy', options));
+
+    pm
+      .command('sell')
+      .description('Sell shares in a prediction market')
+      .requiredOption('--market <slug>', 'Market slug or identifier')
+      .requiredOption('--outcome <outcome>', 'Outcome to sell (Yes or No)')
+      .requiredOption('--amount <n>', 'Number of shares to sell')
+      .option('--price <p>', 'Min price per share (0-1)')
+      .action((options) => this.handlePmOrder('sell', options));
+
+    pm
+      .command('cancel')
+      .description('Cancel an open prediction market order')
+      .requiredOption('--order-id <id>', 'Order ID to cancel')
+      .action((options) => this.handlePmCancel(options));
+
+    pm
+      .command('positions')
+      .description('List your prediction market positions')
+      .action(() => this.handleCallTool('genalpha_get_prediction_positions', { params: '{}' }));
+
+    pm
+      .command('orders')
+      .description('List your open prediction market orders')
+      .action(() => this.handleCallTool('genalpha_get_prediction_orders', { params: JSON.stringify({ status: 'open' }) }));
+
+    pm
+      .command('search')
+      .description('Search prediction markets')
+      .requiredOption('-q, --query <query>', 'Search query')
+      .action((options) => this.handleCallTool('genalpha_search_prediction_markets', { params: JSON.stringify({ query: options.query }) }));
+  }
+
+  private setupMonitorCommands(): void {
+    const monitor = this.program
+      .command('monitor')
+      .description('Copy-trading / monitoring');
+
+    monitor
+      .command('add')
+      .description('Add a wallet or handle to monitor and copy-trade')
+      .requiredOption('--handle <user>', 'Twitter handle or wallet address')
+      .requiredOption('--budget <n>', 'Budget in USDC per trade')
+      .option('--tp <percent>', 'Take-profit percentage (e.g. 20%)')
+      .option('--sl <percent>', 'Stop-loss percentage (e.g. 10%)')
+      .action((options) => this.handleMonitorAdd(options));
+
+    monitor
+      .command('list')
+      .description('List active conditional orders / monitors')
+      .action(() => this.handleCallTool('genalpha_list_conditional_orders', { params: '{}' }));
+
+    monitor
+      .command('cancel')
+      .description('Cancel a conditional order / monitor')
+      .requiredOption('--order-id <id>', 'Order ID to cancel')
+      .action((options) => this.handleCallTool('genalpha_cancel_conditional_order', { params: JSON.stringify({ order_id: options.orderId }) }));
+  }
+
+  private setupMarketCommands(): void {
+    const market = this.program
+      .command('market')
+      .description('Market data and analytics');
+
+    market
+      .command('hot-tokens')
+      .description('Get trending / hot tokens')
+      .action(() => this.handleCallTool('genalpha_get_hot_tokens', { params: '{}' }));
+  }
+
+  // -------------------------------------------------------------------------
+  // Shared helpers
+  // -------------------------------------------------------------------------
+
+  private getServerBaseUrl(): string {
+    const globalOptions = this.program.opts();
+    const serverUrl: string = globalOptions.server || this.defaultServerUrl;
+    // Strip /mcp suffix to get the base URL
+    return serverUrl.replace(/\/mcp$/, '');
+  }
+
+  private async createTradeClient(): Promise<TradeClient> {
+    const baseUrl = this.getServerBaseUrl();
+    const globalOptions = this.program.opts();
+
+    return new TradeClient(baseUrl, async () => {
+      const token = await TokenManager.ensureToken(globalOptions.token);
+      if (!token) {
+        const authToken = await this.runFirstTimeAuth();
+        if (!authToken) {
+          console.log('Authentication required. Exiting.');
+          process.exit(1);
+        }
+        return authToken;
+      }
+      return token;
+    });
+  }
+
+  private formatTradeResponse(resp: TradeResponse): void {
+    if (resp.status === 'success') {
+      console.log(JSON.stringify(resp.result, null, 2));
+    } else if (resp.status === 'action_required') {
+      console.log(`\nAction Required: ${resp.reason}`);
+      if (resp.next_steps?.length) {
+        console.log('\nNext steps:');
+        resp.next_steps.forEach((step, i) => console.log(`  ${i + 1}. ${step}`));
+      }
+      if (resp.hint) console.log(`\nHint: ${resp.hint}`);
+    } else {
+      console.error(`Error: ${resp.reason}`);
+      process.exit(1);
+    }
   }
 
   private async createClient(options: any): Promise<MCPClient> {
-    // Get authentication token
     const globalOptions = this.program.opts();
-    const token = await TokenManager.getToken(globalOptions.token || options.token);
+    let token = await TokenManager.ensureToken(globalOptions.token || options.token);
 
     if (!token) {
-      TokenManager.printTokenInstructions();
-      process.exit(1);
+      token = await this.runFirstTimeAuth();
+      if (!token) {
+        console.log('Authentication required. Exiting.');
+        process.exit(1);
+      }
     }
 
-    if (!TokenManager.validateToken(token)) {
-      logError('Invalid token format');
-      process.exit(1);
-    }
-
-    // Create and connect MCP client
     const serverUrl = globalOptions.server || options.server || this.defaultServerUrl;
     const timeout = parseInt(globalOptions.timeout || options.timeout || '30000');
-
-    logSuccess('Authentication token found');
 
     return await MCPClient.create({
       serverUrl,
@@ -157,6 +402,319 @@ export class CLI {
       timeout,
     });
   }
+
+  private async runFirstTimeAuth(): Promise<string | null> {
+    console.log('\nNo authentication found. Choose a method:\n');
+    console.log('  (a) Create new wallet');
+    console.log('  (b) Use existing wallet (browser signing)');
+    console.log('  (c) Restore from mnemonic backup file');
+    console.log('');
+
+    const choice = await this.prompt('Enter choice [a/b/c]: ');
+
+    switch (choice.toLowerCase()) {
+      case 'a':
+        return this.authNewWallet();
+      case 'b':
+        return this.authExistingWallet();
+      case 'c':
+        return this.authMnemonicRestore();
+      default:
+        console.log('Invalid choice.');
+        return null;
+    }
+  }
+
+  private async prompt(question: string): Promise<string> {
+    const { createInterface } = await import('readline');
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    return new Promise(resolve => {
+      rl.question(question, answer => {
+        rl.close();
+        resolve(answer.trim());
+      });
+    });
+  }
+
+  private async authNewWallet(): Promise<string | null> {
+    const { Wallet } = await import('ethers');
+    const wallet = Wallet.createRandom();
+    const mnemonic = wallet.mnemonic?.phrase;
+
+    if (!mnemonic) {
+      logError('Failed to generate wallet.');
+      return null;
+    }
+
+    await TokenManager.saveMnemonic(mnemonic);
+
+    // Output structured info for host agent (openClaw etc.)
+    const authEvent = {
+      auth_event: 'wallet_created',
+      mnemonic_file: TokenManager.MNEMONIC_FILE_PATH,
+      mnemonic,
+      warning: 'Loss of mnemonic means permanent loss of account access. Please back up securely.',
+      address: wallet.address,
+    };
+    console.log('\n' + JSON.stringify(authEvent, null, 2) + '\n');
+
+    logInfo('Authenticating with new wallet...');
+    const tokens = await TokenManager.challengeVerify(wallet);
+    if (!tokens) {
+      logError('Authentication failed.');
+      return null;
+    }
+
+    logSuccess('Authentication successful.');
+    return TokenManager.normalizeToken(tokens.access_token);
+  }
+
+  private async authExistingWallet(): Promise<string | null> {
+    const session = await TokenManager.createAgentSession();
+    if (!session) {
+      logError('Failed to create auth session.');
+      return null;
+    }
+
+    const url = `${TokenManager.AGENT_AUTH_URL}?sid=${session.session_id}`;
+    console.log('\nPlease open this URL in your browser to authenticate:\n');
+    console.log(`  ${url}\n`);
+    logInfo('Waiting for authentication...');
+
+    const tokens = await TokenManager.pollAgentSession(session.session_id, session.expires_at);
+    if (!tokens) {
+      logError('Login expired. Please re-run the command.');
+      return null;
+    }
+
+    logSuccess('Authentication successful.');
+    return TokenManager.normalizeToken(tokens.access_token);
+  }
+
+  private async authMnemonicRestore(): Promise<string | null> {
+    const filePath = await this.prompt('Enter path to mnemonic backup file: ');
+    if (!filePath) {
+      logError('No path provided.');
+      return null;
+    }
+
+    try {
+      const { readFile } = await import('fs/promises');
+      const mnemonic = (await readFile(filePath, 'utf8')).trim();
+
+      const { Wallet } = await import('ethers');
+      const wallet = Wallet.fromPhrase(mnemonic);
+
+      await TokenManager.saveMnemonic(mnemonic);
+      logSuccess(`Wallet restored: ${wallet.address}`);
+
+      const tokens = await TokenManager.challengeVerify(wallet);
+      if (!tokens) {
+        logError('Authentication failed.');
+        return null;
+      }
+
+      logSuccess('Authentication successful.');
+      return TokenManager.normalizeToken(tokens.access_token);
+    } catch (error) {
+      logError(`Failed to restore from mnemonic: ${error instanceof Error ? error.message : error}`);
+      return null;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Trade handlers (use TradeClient)
+  // -------------------------------------------------------------------------
+
+  private async handleSpot(action: 'buy' | 'sell', options: any): Promise<void> {
+    try {
+      const client = await this.createTradeClient();
+      const body: Record<string, unknown> = {
+        action,
+        base: options.base,
+        quote: options.quote,
+        amount: options.amount,
+        chain: options.chain,
+      };
+      logInfo(`Spot ${action}: ${options.amount} ${action === 'buy' ? options.quote + ' -> ' + options.base : options.base + ' -> ' + options.quote} on ${options.chain}`);
+      const resp = await client.call('spot', body);
+      this.formatTradeResponse(resp);
+    } catch (error) {
+      logError(`Spot ${action} failed: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  }
+
+  private async handlePerp(action: 'long' | 'short' | 'close', options: any): Promise<void> {
+    try {
+      const client = await this.createTradeClient();
+
+      if (action === 'close') {
+        logInfo(`Perp close: ${options.asset}`);
+        const resp = await client.call('close-perp', { asset: options.asset });
+        this.formatTradeResponse(resp);
+        return;
+      }
+
+      const body: Record<string, unknown> = {
+        direction: action,
+        asset: options.asset,
+        size: options.size,
+      };
+      if (options.leverage) body.leverage = parseInt(options.leverage, 10);
+      if (options.price) body.price = options.price;
+      if (options.tp) body.take_profit = options.tp;
+      if (options.sl) body.stop_loss = options.sl;
+      logInfo(`Perp ${action}: ${options.asset} size=${options.size}`);
+      const resp = await client.call('perp', body);
+      this.formatTradeResponse(resp);
+    } catch (error) {
+      logError(`Perp ${action} failed: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  }
+
+  private async handleHlSpot(action: 'buy' | 'sell', options: any): Promise<void> {
+    try {
+      const client = await this.createTradeClient();
+      const body: Record<string, unknown> = {
+        action,
+        token: options.coin,
+        amount: options.amount,
+      };
+      if (options.price) body.price = options.price;
+      logInfo(`HL-Spot ${action}: ${options.coin} amount=${options.amount}`);
+      const resp = await client.call('hl-spot', body);
+      this.formatTradeResponse(resp);
+    } catch (error) {
+      logError(`HL-Spot ${action} failed: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  }
+
+  private async handlePmOrder(action: 'buy' | 'sell', options: any): Promise<void> {
+    try {
+      const client = await this.createTradeClient();
+      const body: Record<string, unknown> = {
+        action,
+        market: options.market,
+        outcome: options.outcome,
+        amount: options.amount,
+      };
+      if (options.price) body.price = options.price;
+      logInfo(`PM ${action}: ${options.outcome} on ${options.market} for ${options.amount}`);
+      const resp = await client.call('prediction', body);
+      this.formatTradeResponse(resp);
+    } catch (error) {
+      logError(`PM ${action} failed: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  }
+
+  private async handlePmCancel(options: any): Promise<void> {
+    try {
+      const client = await this.createTradeClient();
+      const body: Record<string, unknown> = {
+        order_id: options.orderId,
+      };
+      logInfo(`PM cancel: order ${options.orderId}`);
+      const resp = await client.call('cancel-prediction', body);
+      this.formatTradeResponse(resp);
+    } catch (error) {
+      logError(`PM cancel failed: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  }
+
+  private async handleMonitorAdd(options: any): Promise<void> {
+    try {
+      const client = await this.createTradeClient();
+      const body: Record<string, unknown> = {
+        handle: options.handle,
+        budget: options.budget,
+      };
+      if (options.tp) body.take_profit = options.tp;
+      if (options.sl) body.stop_loss = options.sl;
+      logInfo(`Monitor add: ${options.handle} budget=${options.budget}`);
+      const resp = await client.call('monitor', body);
+      this.formatTradeResponse(resp);
+    } catch (error) {
+      logError(`Monitor add failed: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Logout handler
+  // -------------------------------------------------------------------------
+
+  private async handleLogin(): Promise<void> {
+    // Only check stored token file — do NOT use ensureToken() which
+    // auto-recovers from mnemonic and would bypass the login flow.
+    const existing = await TokenManager.getToken();
+    if (existing) {
+      logInfo('Already logged in.');
+      return;
+    }
+
+    const token = await this.runFirstTimeAuth();
+    if (token) {
+      logInfo('Login successful.');
+    } else {
+      logError('Login failed.');
+      process.exit(1);
+    }
+  }
+
+  private async handleLogout(): Promise<void> {
+    const { unlink } = await import('fs/promises');
+    const { join } = await import('path');
+    const { homedir } = await import('os');
+    const tokenFile = join(homedir(), '.aiusd', 'token.json');
+    try {
+      await unlink(tokenFile);
+      console.log('Logged out. Token removed.');
+    } catch {
+      console.log('No active session found.');
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Guide handler (stateless, no auth)
+  // -------------------------------------------------------------------------
+
+  private async handleGuide(domain?: string): Promise<void> {
+    try {
+      const baseUrl = this.getServerBaseUrl();
+      if (!domain) {
+        const resp = await fetch(`${baseUrl}/api/trade/guides`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json() as { domains: string[] };
+        console.log('Available domains:');
+        data.domains.forEach((d: string) => console.log(`  - ${d}`));
+        console.log('\nUsage: aiusd guide <domain>');
+        return;
+      }
+      const resp = await fetch(`${baseUrl}/api/trade/guides/${domain}`);
+      if (!resp.ok) {
+        if (resp.status === 404) {
+          logError(`Unknown domain: ${domain}. Run 'aiusd guide' to see available domains.`);
+        } else {
+          logError(`Failed to fetch guide: HTTP ${resp.status}`);
+        }
+        process.exit(1);
+      }
+      const data = await resp.json() as { domain: string; version: string; guide: string };
+      console.log(data.guide);
+    } catch (error) {
+      logError(`Failed to fetch guide: ${error instanceof Error ? error.message : error}`);
+      process.exit(1);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Original handlers (use MCPClient)
+  // -------------------------------------------------------------------------
 
   private async handleTest(options: any): Promise<void> {
     try {
@@ -264,65 +822,17 @@ export class CLI {
     }
   }
 
-  private async handleTrade(options: any): Promise<void> {
-    try {
-      // Build intent XML from structured params
-      const { xml, summary } = buildIntentXml({
-        action: options.action,
-        base: options.base,
-        quote: options.quote,
-        amount: options.amount,
-        chain: options.chain,
-        takeProfit: options.takeProfit ? parseFloat(options.takeProfit) : undefined,
-        stopLoss: options.stopLoss ? parseFloat(options.stopLoss) : undefined,
-      });
-
-      logInfo(`Trade: ${summary}`);
-
-      if (options.dryRun) {
-        console.log('');
-        console.log('📋 Generated Intent XML (dry run):');
-        console.log(xml);
-        return;
-      }
-
-      // Execute via MCP
-      const client = await this.createClient(options);
-      const result = await client.callTool('genalpha_execute_intent', { intent: xml });
-
-      console.log('');
-      console.log('📋 Trade Result:');
-      console.log('');
-
-      const formattedResult = MCPClient.formatToolResult(result);
-
-      if (options.pretty) {
-        try {
-          const jsonResult = JSON.parse(formattedResult);
-          console.log(JSON.stringify(jsonResult, null, 2));
-        } catch {
-          console.log(formattedResult);
-        }
-      } else {
-        console.log(formattedResult);
-      }
-
-      await client.disconnect();
-    } catch (error) {
-      logError(`Trade failed: ${error instanceof Error ? error.message : error}`);
-      process.exit(1);
-    }
-  }
-
   private async handleGetDepositAddress(options: any): Promise<void> {
     try {
       // Get authentication token
       const globalOptions = this.program.opts();
-      const token = await TokenManager.getToken(globalOptions.token || options.token);
-
+      let token = await TokenManager.ensureToken(globalOptions.token || options.token);
       if (!token) {
-        TokenManager.printTokenInstructions();
-        process.exit(1);
+        token = await this.runFirstTimeAuth();
+        if (!token) {
+          console.log('Authentication required. Exiting.');
+          process.exit(1);
+        }
       }
 
       logInfo('Fetching deposit addresses...');

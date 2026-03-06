@@ -97,11 +97,9 @@ tmp/
 temp/
 
 # Auth tokens and credentials (security)
-.mcp-hub/
-.mcporter/
+.aiusd/
 auth.json
 token.json
-credentials.json
 
 # Skill packages
 *.skill

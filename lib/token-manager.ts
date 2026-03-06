@@ -1,187 +1,109 @@
 /**
- * Token Manager - Handles authentication token from multiple sources
+ * Token Manager (library version)
  *
- * Priority order:
- * 1. Environment variables (MCP_HUB_TOKEN, AIUSD_TOKEN)
- * 2. mcporter configuration
- * 3. Local token files
+ * Priority: env var -> ~/.aiusd/token.json
+ * Supports refresh but not interactive auth.
  */
 
-import { readFile, access } from 'fs/promises';
+import { readFile, writeFile, access, mkdir } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
-import { execSync } from 'child_process';
 
-export interface TokenData {
-  token: string;
-  timestamp?: number;
-  expires_in?: number;
-  refresh_token?: string;
+const AIUSD_DIR = join(homedir(), '.aiusd');
+const TOKEN_FILE = join(AIUSD_DIR, 'token.json');
+const REFRESH_URL = 'https://production.alpha.dev/api/user-service/v1/auth/refresh';
+
+export interface StoredTokens {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  timestamp: number;
 }
 
 export class TokenManager {
-  /**
-   * Get token from environment variables
-   */
   private static getTokenFromEnv(): string | null {
-    return process.env.MCP_HUB_TOKEN || process.env.AIUSD_TOKEN || null;
+    return process.env.AIUSD_TOKEN || null;
   }
 
-  /**
-   * Get token from mcporter credentials file
-   */
-  private static async getTokenFromMcporterCredentials(): Promise<string | null> {
+  private static async readStoredTokens(): Promise<StoredTokens | null> {
     try {
-      const credentialsPath = join(homedir(), '.mcporter', 'credentials.json');
-      await access(credentialsPath);
-      const content = await readFile(credentialsPath, 'utf8');
-      const credentials = JSON.parse(content);
-
-      // Look for tokens in entries
-      if (credentials.entries) {
-        for (const [key, entry] of Object.entries(credentials.entries as any)) {
-          const typedEntry = entry as any;
-          if (typedEntry.tokens?.access_token) {
-            return typedEntry.tokens.access_token;
-          }
-        }
+      await access(TOKEN_FILE);
+      const content = await readFile(TOKEN_FILE, 'utf8');
+      const data = JSON.parse(content) as StoredTokens;
+      if (data.access_token && data.refresh_token && data.expires_in && data.timestamp) {
+        return data;
       }
-    } catch (error) {
-      // File doesn't exist or invalid format
+      return null;
+    } catch {
+      return null;
     }
-    return null;
   }
 
-  /**
-   * Get token from mcporter
-   */
-  private static async getTokenFromMcporter(): Promise<string | null> {
+  private static isExpired(tokens: StoredTokens): boolean {
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    return nowSeconds >= tokens.timestamp + tokens.expires_in;
+  }
+
+  private static async saveTokens(tokens: StoredTokens): Promise<void> {
+    await mkdir(AIUSD_DIR, { recursive: true });
+    await writeFile(TOKEN_FILE, JSON.stringify(tokens, null, 2), { encoding: 'utf8', mode: 0o600 });
+  }
+
+  private static async refreshAccessToken(refreshToken: string): Promise<StoredTokens | null> {
     try {
-      // Check if mcporter is available
-      execSync('which mcporter', { stdio: 'pipe' });
+      const res = await fetch(REFRESH_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json() as {
+        access_token: string;
+        refresh_token: string;
+        expires_in: number;
+      };
 
-      // Check if authenticated
-      execSync('mcporter auth check', { stdio: 'pipe' });
-
-      // Get token
-      const token = execSync('mcporter get-token', { encoding: 'utf8' }).trim();
-      return token || null;
-    } catch (error) {
-      // mcporter not available or not authenticated
+      const tokens: StoredTokens = {
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_in: data.expires_in,
+        timestamp: Math.floor(Date.now() / 1000),
+      };
+      await this.saveTokens(tokens);
+      return tokens;
+    } catch {
+      return null;
     }
-    return null;
   }
 
-  /**
-   * Get token from local file
-   */
-  private static async getTokenFromFile(filePath: string): Promise<string | null> {
-    try {
-      await access(filePath);
-      const content = await readFile(filePath, 'utf8');
-      const data: TokenData = JSON.parse(content);
-
-      // Check if token is expired
-      if (data.timestamp && data.expires_in) {
-        const age = Date.now() / 1000 - data.timestamp;
-        if (age > data.expires_in) {
-          return null;
-        }
-      }
-
-      return data.token || (data as any).access_token || null;
-    } catch (error) {
-      // File doesn't exist or invalid format
-    }
-    return null;
-  }
-
-  /**
-   * Get token from various sources in priority order
-   */
-  static async getToken(): Promise<string | null> {
-    // 1. Environment variables
-    const envToken = this.getTokenFromEnv();
-    if (envToken) {
-      return this.normalizeToken(envToken);
-    }
-
-    // 2. mcporter credentials file
-    const mcporterCredentialsToken = await this.getTokenFromMcporterCredentials();
-    if (mcporterCredentialsToken) {
-      return this.normalizeToken(mcporterCredentialsToken);
-    }
-
-    // 3. mcporter CLI
-    const mcporterToken = await this.getTokenFromMcporter();
-    if (mcporterToken) {
-      return this.normalizeToken(mcporterToken);
-    }
-
-    // 4. Local token files
-    const tokenFiles = [
-      join(homedir(), '.mcp-hub', 'token.json'),
-      join(homedir(), '.mcporter', 'auth.json'),
-    ];
-
-    for (const filePath of tokenFiles) {
-      const fileToken = await this.getTokenFromFile(filePath);
-      if (fileToken) {
-        return this.normalizeToken(fileToken);
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Ensure token has Bearer prefix
-   */
   private static normalizeToken(token: string): string {
-    if (!token.startsWith('Bearer ')) {
-      return `Bearer ${token}`;
-    }
-    return token;
+    return token.startsWith('Bearer ') ? token : `Bearer ${token}`;
   }
 
-  /**
-   * Get setup instructions for authentication
-   */
+  static async getToken(): Promise<string | null> {
+    const envToken = this.getTokenFromEnv();
+    if (envToken) return this.normalizeToken(envToken);
+
+    const stored = await this.readStoredTokens();
+    if (stored && !this.isExpired(stored)) {
+      return this.normalizeToken(stored.access_token);
+    }
+
+    // Try refresh
+    if (stored?.refresh_token) {
+      const refreshed = await this.refreshAccessToken(stored.refresh_token);
+      if (refreshed) return this.normalizeToken(refreshed.access_token);
+    }
+
+    return null;
+  }
+
   static getSetupInstructions(): string {
-    return `Authentication required. Please set up using one of these methods:
-
-1. Environment variable:
-   export MCP_HUB_TOKEN="Bearer your_token_here"
-
-2. Use mcporter:
-   npx mcporter list --http-url https://mcp.alpha.dev/api/mcp-hub/mcp --name aiusd
-
-3. Manual token file:
-   mkdir -p ~/.mcp-hub
-   echo '{"token": "Bearer your_token_here", "timestamp": ${Math.floor(Date.now() / 1000)}, "expires_in": 86400}' > ~/.mcp-hub/token.json
-
-To get a token, visit: https://mcp.alpha.dev/oauth/login`;
+    return 'Authentication required. Run: npm run login';
   }
 
-  /**
-   * Validate token format
-   */
   static validateToken(token: string): boolean {
-    if (!token || typeof token !== 'string') {
-      return false;
-    }
-
-    if (!token.startsWith('Bearer ')) {
-      return false;
-    }
-
-    // Basic JWT format check
-    const jwtPart = token.substring(7); // Remove "Bearer "
-    const parts = jwtPart.split('.');
-    if (parts.length !== 3) {
-      return false;
-    }
-
-    return true;
+    if (!token?.startsWith('Bearer ')) return false;
+    return token.substring(7).split('.').length === 3;
   }
 }

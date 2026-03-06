@@ -172,13 +172,13 @@ async function install() {
     log('🎉 AIUSD Skill installed successfully!', 'green');
     log('', 'reset');
     log('🚀 Next Steps:', 'yellow');
-    log('1. cd aiusd-skill', 'blue');
-    log('2. npm run setup', 'blue');
+    log('1. cd aiusd-skill && npm install -g .', 'blue');
+    log('2. aiusd login', 'blue');
     log('', 'reset');
     log('💡 Usage Examples:', 'cyan');
-    log('• Check balance: npm start -- balances', 'blue');
-    log('• List tools: npm start -- tools', 'blue');
-    log('• Get help: npm start -- --help', 'blue');
+    log('• Check balance: aiusd balances', 'blue');
+    log('• Trade: aiusd guide spot', 'blue');
+    log('• Get help: aiusd --help', 'blue');
     log('', 'reset');
 
   } catch (error) {

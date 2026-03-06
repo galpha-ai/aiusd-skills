@@ -1,11 +1,11 @@
 {
   "name": "aiusd-skill",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "AIUSD trading and account management skill via MCP protocol. ",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && chmod +x dist/index.js",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "test": "npm run build && node dist/index.js test",
@@ -16,23 +16,18 @@
     "build-installers": "node scripts/build-js-installer.js && node scripts/build-sh-installer.js",
     "publish-cli": "cd packages/aiusd-skills && npm publish",
     "setup": "node scripts/skill-init.js",
-    "reauth": "node scripts/reauth.js",
-    "login": "node scripts/smart-login.js",
-    "smart-login": "node scripts/smart-login.js",
-    "oauth": "node scripts/oauth.js",
-    "test-reauth": "node scripts/test-reauth.js",
-    "show-auth": "node scripts/show-auth-locations.js",
-    "postinstall": "patch-package && node scripts/skill-init.js"
+    "login": "node dist/index.js login",
+    "postinstall": "node scripts/skill-init.js"
   },
   "bin": {
-    "aiusd-skill": "./dist/index.js"
+    "aiusd": "./dist/index.js"
   },
   "files": [
     "dist/**/*",
     "src/**/*",
-    "patches/",
     "README.md",
     "SKILL.md",
+    "skills/",
     "scripts/",
     "package.json",
     "tsconfig.json"
@@ -41,12 +36,10 @@
     "@modelcontextprotocol/sdk": "^1.10.0",
     "commander": "^12.0.0",
     "ethers": "^6.13.0",
-    "mcporter": "^0.7.3",
     "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "patch-package": "^8.0.1",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
   },
@@ -66,10 +59,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aiusd/aiusd-skill.git"
+    "url": "https://github.com/galpha-ai/aiusd-skills.git"
   },
-  "homepage": "https://github.com/aiusd/aiusd-skill#readme",
+  "homepage": "https://github.com/galpha-ai/aiusd-skills#readme",
   "bugs": {
-    "url": "https://github.com/aiusd/aiusd-skill/issues"
+    "url": "https://github.com/galpha-ai/aiusd-skills/issues"
   }
 }

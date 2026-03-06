@@ -33,7 +33,7 @@ async function buildSkill() {
   const skillFile = `${packageName}.skill`;
   const distDir = join(projectRoot, 'dist');
   const buildOutputDir = join(projectRoot, 'build');
-  const tempBuildDir = join(distDir, 'temp-build');
+  const tempBuildDir = join(buildOutputDir, 'temp-build');
   const skillPath = join(buildOutputDir, skillFile);
 
   log('🚀 Building AIUSD Skill package...', 'magenta');
@@ -66,13 +66,12 @@ async function buildSkill() {
       'package.json',
       'README.md',
       'SKILL.md',
-      'AUTHENTICATION.md',
-      'scripts/',
+      'skills/',
       'dist/',
-      'src/',
-      'patches/',
-      'tsconfig.json'
     ];
+
+    // Only include skill-init.js from scripts/ (postinstall hook)
+    const scriptsToCopy = ['scripts/skill-init.js'];
 
     // Note: Excluding node_modules to keep package size under 5MB limit
     // Users will need to run 'npm install' after extracting
@@ -83,15 +82,24 @@ async function buildSkill() {
 
       if (existsSync(srcPath)) {
         if (file.endsWith('/')) {
-          // Directory
           execSync(`cp -R "${srcPath}" "${destPath}"`, { stdio: 'pipe' });
         } else {
-          // File
           execSync(`cp "${srcPath}" "${destPath}"`, { stdio: 'pipe' });
         }
         log(`   ✅ Copied ${file}`, 'green');
       } else {
         log(`   ⚠️  Skipped ${file} (not found)`, 'yellow');
+      }
+    }
+
+    // Copy only the postinstall script from scripts/
+    execSync(`mkdir -p "${join(tempBuildDir, 'scripts')}"`, { stdio: 'pipe' });
+    for (const script of scriptsToCopy) {
+      const srcPath = join(projectRoot, script);
+      const destPath = join(tempBuildDir, script);
+      if (existsSync(srcPath)) {
+        execSync(`cp "${srcPath}" "${destPath}"`, { stdio: 'pipe' });
+        log(`   ✅ Copied ${script}`, 'green');
       }
     }
 
@@ -158,9 +166,9 @@ async function buildSkill() {
     log('', 'reset');
     log('📋 Usage:', 'yellow');
     log('• Extract: tar -xzf build/aiusd-skill-agent.skill', 'blue');
-    log('• Install: cd extracted-dir && npm install', 'blue');
-    log('• Use: npm run setup (for authentication and testing)', 'blue');
-    log('• Distribute: Lightweight package without node_modules', 'cyan');
+    log('• Install: cd extracted-dir && npm install -g .', 'blue');
+    log('• Login: aiusd login', 'blue');
+    log('• Use: aiusd balances', 'cyan');
 
   } catch (error) {
     log(`❌ Build failed: ${error.message}`, 'red');
