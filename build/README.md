@@ -4,21 +4,21 @@ The official AIUSD trading skill for your personal AI assistant. Trade crypto, c
 
 ## Install the Skill
 
-**Option A: Drag & Drop (Easiest)**
-1. Download the skill file: **[Download aiusd-skill-agent.skill](https://github.com/galpha-ai/aiusd-skills/releases/latest/download/aiusd-skill-agent.skill)**
-2. Open your chat (Telegram, Discord, WhatsApp, etc.)
-3. Drag and drop the `.skill` file into the chat
-4. Your bot will automatically install the skill
-
-**Option B: npx (one command)**
+**Option A: One-liner (recommended)**
 ```bash
-npx aiusd-skills install
+cd ~/.openclaw/skills && curl -sL https://github.com/galpha-ai/aiusd-skills/releases/latest/download/aiusd-skill-agent.skill | tar -xz && npm install
 ```
 
+**Option B: Drag & Drop**
+1. Download: **[aiusd-skill-agent.skill](https://github.com/galpha-ai/aiusd-skills/releases/latest/download/aiusd-skill-agent.skill)**
+2. Drop the `.skill` file into your OpenClaw chat
+3. The bot installs it automatically
+
 **Option C: Manual**
-1. [Download aiusd-skill-agent.skill](https://github.com/galpha-ai/aiusd-skills/releases/latest/download/aiusd-skill-agent.skill) and extract: `tar -xzf aiusd-skill-agent.skill`
-2. Copy the extracted folder to your OpenClaw skills directory
-3. Restart your bot
+1. Download [aiusd-skill-agent.skill](https://github.com/galpha-ai/aiusd-skills/releases/latest/download/aiusd-skill-agent.skill)
+2. Extract: `mkdir -p ~/.openclaw/skills/aiusd-skill && tar -xzf aiusd-skill-agent.skill -C ~/.openclaw/skills/aiusd-skill`
+3. Install: `cd ~/.openclaw/skills/aiusd-skill && npm install`
+4. Start a new OpenClaw session
 
 ## Authentication
 

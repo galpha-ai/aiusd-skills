@@ -59,10 +59,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aiusd/aiusd-skill.git"
+    "url": "https://github.com/galpha-ai/aiusd-skills.git"
   },
-  "homepage": "https://github.com/aiusd/aiusd-skill#readme",
+  "homepage": "https://github.com/galpha-ai/aiusd-skills#readme",
   "bugs": {
-    "url": "https://github.com/aiusd/aiusd-skill/issues"
+    "url": "https://github.com/galpha-ai/aiusd-skills/issues"
   }
 }

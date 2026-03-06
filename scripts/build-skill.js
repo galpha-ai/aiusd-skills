@@ -33,7 +33,7 @@ async function buildSkill() {
   const skillFile = `${packageName}.skill`;
   const distDir = join(projectRoot, 'dist');
   const buildOutputDir = join(projectRoot, 'build');
-  const tempBuildDir = join(distDir, 'temp-build');
+  const tempBuildDir = join(buildOutputDir, 'temp-build');
   const skillPath = join(buildOutputDir, skillFile);
 
   log('🚀 Building AIUSD Skill package...', 'magenta');
