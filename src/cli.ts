@@ -148,7 +148,10 @@ export class CLI {
     this.program
       .command('login')
       .description('Authenticate with AIUSD (create wallet or browser login)')
-      .action(() => this.handleLogin());
+      .option('--new-wallet', 'Create a new wallet (non-interactive)')
+      .option('--browser', 'Browser login (non-interactive)')
+      .option('--restore <path>', 'Restore from mnemonic backup file (non-interactive)')
+      .action((options) => this.handleLogin(options));
 
     // --- Logout subcommand ---
     this.program
@@ -497,7 +500,10 @@ export class CLI {
       logError('No path provided.');
       return null;
     }
+    return this.authMnemonicRestoreFromFile(filePath);
+  }
 
+  private async authMnemonicRestoreFromFile(filePath: string): Promise<string | null> {
     try {
       const { readFile } = await import('fs/promises');
       const mnemonic = (await readFile(filePath, 'utf8')).trim();
@@ -648,7 +654,7 @@ export class CLI {
   // Logout handler
   // -------------------------------------------------------------------------
 
-  private async handleLogin(): Promise<void> {
+  private async handleLogin(options: { newWallet?: boolean; browser?: boolean; restore?: string } = {}): Promise<void> {
     // Only check stored token file — do NOT use ensureToken() which
     // auto-recovers from mnemonic and would bypass the login flow.
     const existing = await TokenManager.getToken();
@@ -657,7 +663,19 @@ export class CLI {
       return;
     }
 
-    const token = await this.runFirstTimeAuth();
+    let token: string | null = null;
+
+    // Non-interactive flags take priority over interactive prompt
+    if (options.newWallet) {
+      token = await this.authNewWallet();
+    } else if (options.browser) {
+      token = await this.authExistingWallet();
+    } else if (options.restore) {
+      token = await this.authMnemonicRestoreFromFile(options.restore);
+    } else {
+      token = await this.runFirstTimeAuth();
+    }
+
     if (token) {
       logInfo('Login successful.');
     } else {
