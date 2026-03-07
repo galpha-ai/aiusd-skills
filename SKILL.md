@@ -1,8 +1,8 @@
 ---
 name: aiusd-skill
-version: 2.0.0
 description: "AIUSD — trade crypto, earn yield, move money across chains."
-license: MIT
+homepage: https://aiusd.ai
+metadata: { "openclaw": { "emoji": "💰", "requires": { "bins": ["node"] } } }
 ---
 
 # AIUSD Skill
@@ -27,23 +27,25 @@ Trigger this skill when the user wants to:
 
 ## Authentication
 
-When a user wants to get started or is not yet logged in, run `aiusd login`. Present 2 options:
+When a user wants to get started or is not yet logged in, present 2 options:
 
 1. **Create new account** — set up a fresh wallet
 2. **Browser login** — sign in with an existing account via browser
 
-The CLI prompts with choices `a/b/c`. Map the user's choice:
-- User picks **Create new account** → pipe `a` into the CLI. The CLI creates a wallet and authenticates automatically.
-- User picks **Browser login** → pipe `b` into the CLI **and run it in the background**. The CLI prints a URL starting with `https://` that contains `agent-auth?sid=agent_ses_`. You MUST read the actual output from the background process, find the real URL, and send it to the user verbatim. **NEVER fabricate or guess the URL — the session ID is a unique UUID that only the server knows.** The process completes automatically once the user signs in.
-
-Do NOT offer "restore from backup" (option `c`) unless the user explicitly asks.
+Map the user's choice to the corresponding CLI flag:
+- **Create new account** → `aiusd login --new-wallet`. The CLI creates a wallet, authenticates, and prints a JSON `auth_event` with the wallet address.
+- **Browser login** → `aiusd login --browser`. The CLI prints a URL containing `agent-auth?sid=`. Send the exact URL to the user — **NEVER fabricate or guess it**. The process polls until sign-in completes.
+- **Restore from backup** → `aiusd login --restore <path>`. Only use when the user explicitly asks to restore from a mnemonic file.
 
 | Command | Description |
 |---------|------------|
-| `aiusd login` | Log in (create account or browser sign-in) |
+| `aiusd login --new-wallet` | Create new wallet and authenticate |
+| `aiusd login --browser` | Browser-based login for existing accounts |
+| `aiusd login --restore <path>` | Restore from mnemonic backup file |
+| `aiusd login` | Interactive prompt (fallback for manual use) |
 | `aiusd logout` | Sign out and remove stored token |
 
-To switch account: `aiusd logout`, then `aiusd login`.
+To switch account: `aiusd logout`, then `aiusd login --browser` (or `--new-wallet`).
 
 ## Capabilities
 
