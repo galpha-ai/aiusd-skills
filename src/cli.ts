@@ -149,8 +149,9 @@ export class CLI {
       .command('login')
       .description('Authenticate with AIUSD (create wallet or browser login)')
       .option('--new-wallet', 'Create a new wallet (non-interactive)')
-      .option('--browser', 'Browser login (non-interactive)')
+      .option('--browser', 'Browser login (non-interactive, prints URL and exits)')
       .option('--restore <path>', 'Restore from mnemonic backup file (non-interactive)')
+      .option('--poll-session <session_id>', 'Poll a browser login session until complete')
       .action((options) => this.handleLogin(options));
 
     // --- Logout subcommand ---
@@ -480,18 +481,15 @@ export class CLI {
     }
 
     const url = `${TokenManager.AGENT_AUTH_URL}?sid=${session.session_id}`;
-    console.log('\nPlease open this URL in your browser to authenticate:\n');
-    console.log(`  ${url}\n`);
-    logInfo('Waiting for authentication...');
-
-    const tokens = await TokenManager.pollAgentSession(session.session_id, session.expires_at);
-    if (!tokens) {
-      logError('Login expired. Please re-run the command.');
-      return null;
-    }
-
-    logSuccess('Authentication successful.');
-    return TokenManager.normalizeToken(tokens.access_token);
+    const output = {
+      auth_event: 'browser_login',
+      url,
+      session_id: session.session_id,
+      expires_at: session.expires_at,
+      message: 'Send the URL to the user. Then run: aiusd login --poll-session <session_id>',
+    };
+    console.log(JSON.stringify(output, null, 2));
+    return 'pending';
   }
 
   private async authMnemonicRestore(): Promise<string | null> {
@@ -654,7 +652,12 @@ export class CLI {
   // Logout handler
   // -------------------------------------------------------------------------
 
-  private async handleLogin(options: { newWallet?: boolean; browser?: boolean; restore?: string } = {}): Promise<void> {
+  private async handleLogin(options: { newWallet?: boolean; browser?: boolean; restore?: string; pollSession?: string } = {}): Promise<void> {
+    // --poll-session: wait for a browser login session to complete
+    if (options.pollSession) {
+      return this.handlePollSession(options.pollSession);
+    }
+
     // Only check stored token file — do NOT use ensureToken() which
     // auto-recovers from mnemonic and would bypass the login flow.
     const existing = await TokenManager.getToken();
@@ -676,10 +679,24 @@ export class CLI {
       token = await this.runFirstTimeAuth();
     }
 
-    if (token) {
+    if (token === 'pending') {
+      // Browser login: URL printed, agent should send URL then run --poll-session
+      return;
+    } else if (token) {
       logInfo('Login successful.');
     } else {
       logError('Login failed.');
+      process.exit(1);
+    }
+  }
+
+  private async handlePollSession(sessionId: string): Promise<void> {
+    logInfo('Waiting for browser sign-in...');
+    const tokens = await TokenManager.pollAgentSession(sessionId);
+    if (tokens) {
+      logSuccess('Login successful.');
+    } else {
+      logError('Login expired. Please try again.');
       process.exit(1);
     }
   }

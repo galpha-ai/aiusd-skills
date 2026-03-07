@@ -253,9 +253,9 @@ export class TokenManager {
    */
   static async pollAgentSession(
     sessionId: string,
-    expiresAt: string,
+    expiresAt?: string,
   ): Promise<StoredTokens | null> {
-    const expiresTime = new Date(expiresAt).getTime();
+    const expiresTime = expiresAt ? new Date(expiresAt).getTime() : Date.now() + 5 * 60 * 1000;
 
     while (Date.now() < expiresTime) {
       try {

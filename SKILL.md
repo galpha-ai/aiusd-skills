@@ -34,13 +34,16 @@ When a user wants to get started or is not yet logged in, present 2 options:
 
 Map the user's choice to the corresponding CLI flag:
 - **Create new account** → `aiusd login --new-wallet`. The CLI creates a wallet, authenticates, and prints a JSON `auth_event` with the wallet address.
-- **Browser login** → `aiusd login --browser`. The CLI prints a URL containing `agent-auth?sid=`. Send the exact URL to the user — **NEVER fabricate or guess it**. The process polls until sign-in completes.
+- **Browser login** → two-step flow:
+  1. Run `aiusd login --browser`. The CLI prints a JSON with `url` and `session_id`, then **exits immediately**. Send the `url` to the user — **NEVER fabricate or guess it**.
+  2. After sending the URL, run `aiusd login --poll-session <session_id>`. This blocks until the user signs in, then saves the token and exits with "Login successful".
 - **Restore from backup** → `aiusd login --restore <path>`. Only use when the user explicitly asks to restore from a mnemonic file.
 
 | Command | Description |
 |---------|------------|
 | `aiusd login --new-wallet` | Create new wallet and authenticate |
-| `aiusd login --browser` | Browser-based login for existing accounts |
+| `aiusd login --browser` | Print browser login URL and exit |
+| `aiusd login --poll-session <id>` | Wait for browser sign-in to complete |
 | `aiusd login --restore <path>` | Restore from mnemonic backup file |
 | `aiusd login` | Interactive prompt (fallback for manual use) |
 | `aiusd logout` | Sign out and remove stored token |
