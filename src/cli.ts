@@ -481,6 +481,13 @@ export class CLI {
     }
 
     const url = `${TokenManager.AGENT_AUTH_URL}?sid=${session.session_id}`;
+
+    // Cache session locally for recovery
+    await TokenManager.savePendingSession({
+      session_id: session.session_id,
+      expires_at: session.expires_at,
+    });
+
     const output = {
       auth_event: 'browser_login',
       url,
@@ -694,6 +701,7 @@ export class CLI {
     logInfo('Waiting for browser sign-in...');
     const tokens = await TokenManager.pollAgentSession(sessionId);
     if (tokens) {
+      await TokenManager.clearPendingSession();
       logSuccess('Login successful.');
     } else {
       logError('Login expired. Please try again.');

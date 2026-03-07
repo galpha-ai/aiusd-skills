@@ -16,6 +16,7 @@ import { join } from 'path';
 
 const AIUSD_DIR = join(homedir(), '.aiusd');
 const TOKEN_FILE = join(AIUSD_DIR, 'token.json');
+const SESSION_FILE = join(AIUSD_DIR, 'pending-session.json');
 const MNEMONIC_FILE = join(AIUSD_DIR, 'AIUSD_WALLET_DO_NOT_DELETE');
 
 const API_BASE = 'https://production.alpha.dev/api/user-service';
@@ -29,6 +30,11 @@ export interface StoredTokens {
   refresh_token: string;
   expires_in: number;
   timestamp: number;
+}
+
+export interface PendingSession {
+  session_id: string;
+  expires_at: string;
 }
 
 export type AuthMethod = 'new-wallet' | 'existing-wallet' | 'mnemonic-restore';
@@ -85,6 +91,16 @@ export class TokenManager {
     const recovered = await this.recoverFromMnemonic();
     if (recovered) {
       return this.normalizeToken(recovered.access_token);
+    }
+
+    // Try pending browser session (one-shot check, not polling)
+    const pending = await this.readPendingSession();
+    if (pending) {
+      const tokens = await this.checkAgentSession(pending.session_id);
+      if (tokens) {
+        await this.clearPendingSession();
+        return this.normalizeToken(tokens.access_token);
+      }
     }
 
     // Caller must handle first-time auth
@@ -297,6 +313,87 @@ export class TokenManager {
     }
 
     return null;
+  }
+
+  /**
+   * Single check of an agent session (no polling).
+   * Returns tokens if session is completed, null otherwise.
+   */
+  static async checkAgentSession(sessionId: string): Promise<StoredTokens | null> {
+    try {
+      const response = await fetch(`${AGENT_SESSION_URL}/${sessionId}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) return null;
+
+      const json = await response.json() as {
+        success: boolean;
+        data: {
+          status: string;
+          access_token?: string;
+          refresh_token?: string;
+          expires_in?: number;
+        };
+      };
+      const data = json.data;
+
+      if (data?.status === 'completed' && data.access_token && data.refresh_token && data.expires_in) {
+        const tokens: StoredTokens = {
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+          expires_in: data.expires_in,
+          timestamp: Math.floor(Date.now() / 1000),
+        };
+        await this.saveTokens(tokens);
+        return tokens;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Save a pending browser login session.
+   */
+  static async savePendingSession(session: PendingSession): Promise<void> {
+    await mkdir(AIUSD_DIR, { recursive: true });
+    await writeFile(SESSION_FILE, JSON.stringify(session), { encoding: 'utf8', mode: 0o600 });
+  }
+
+  /**
+   * Read a pending session if it exists and hasn't expired.
+   */
+  static async readPendingSession(): Promise<PendingSession | null> {
+    try {
+      await access(SESSION_FILE);
+      const content = await readFile(SESSION_FILE, 'utf8');
+      const session = JSON.parse(content) as PendingSession;
+      if (session.session_id && session.expires_at) {
+        if (new Date(session.expires_at).getTime() > Date.now()) {
+          return session;
+        }
+      }
+      // Expired, clean up
+      await this.clearPendingSession();
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Remove the pending session file.
+   */
+  static async clearPendingSession(): Promise<void> {
+    try {
+      const { unlink } = await import('fs/promises');
+      await unlink(SESSION_FILE);
+    } catch {
+      // File doesn't exist, ignore
+    }
   }
 
   /**
